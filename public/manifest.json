@@ -1,0 +1,27 @@
+{
+  "name": "THABO KIDS System",
+  "short_name": "THABO KIDS",
+  "description": "ระบบจัดการข้อมูลศูนย์พัฒนาเด็กเล็กเทศบาลเมืองท่าบ่อ",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#0F172A",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
