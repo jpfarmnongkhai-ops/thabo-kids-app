@@ -51,34 +51,51 @@ export default function AddTeacherPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return; // ป้องกันการกดซ้ำ
     setLoading(true);
 
-    // 1. เพิ่มข้อมูลลงตาราง teachers
-    const { error: teacherError } = await supabase
-      .from("teachers")
-      .insert([formData]);
+    try {
+      // 0. เตรียมข้อมูลให้สะอาด (ตัดช่องว่างเบอร์โทร)
+      const cleanPhone = formData.phone.trim().replace(/-/g, "");
+      
+      // 1. เพิ่มข้อมูลลงตาราง teachers
+      const { error: teacherError } = await supabase
+        .from("teachers")
+        .insert([{
+          ...formData,
+          phone: cleanPhone // ใช้เบอร์ที่สะอาดแล้ว
+        }]);
 
-    if (teacherError) {
-      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูลครู: " + teacherError.message);
-    } else {
-      // 2. สร้าง Account ในตาราง profiles ให้ครูอัตโนมัติ (รหัส 123456)
+      if (teacherError) throw new Error(`ข้อมูลครู: ${teacherError.message}`);
+
+      // 2. สร้าง Account ในตาราง profiles อัตโนมัติ
       const { error: profileError } = await supabase
         .from("profiles")
         .insert([{
-          phone: formData.phone,
-          password: "123456", // ตั้งค่าเริ่มต้นให้ตามที่คุยกัน
+          phone: cleanPhone,
+          password: "123456", 
           display_name: formData.nickname,
+          first_name: formData.first_name,
+          last_name: formData.last_name,
           role: "teacher"
         }]);
 
       if (profileError) {
-        console.error("Profile creation error:", profileError.message);
+        // กรณีบันทึกครูสำเร็จแต่ Profile พัง (เช่น เบอร์โทรซ้ำใน Profiles)
+        console.error("Profile Error:", profileError.message);
+        throw new Error(`สร้างบัญชีไม่สำเร็จ: ${profileError.message}`);
       }
 
-      alert("ยินดีต้อนรับบุคลากรใหม่เข้าสู่ ThaBo Kids System ศูนย์พัฒนาเด็กเล็กเทศบาลเมืองท่าบ่อ ครับ! ✨");
+      // ถ้าผ่านหมดทั้งคู่
+      alert("ยินดีต้อนรับบุคลากรใหม่เข้าสู่ ThaBo Kids System ครับ! ✨");
       router.push("/admin/teachers");
+      router.refresh(); // บังคับให้หน้าลิสต์อัปเดตข้อมูลใหม่ทันที
+
+    } catch (error: any) {
+      alert("เกิดข้อผิดพลาด: " + error.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
