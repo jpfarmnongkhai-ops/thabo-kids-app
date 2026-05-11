@@ -9,7 +9,7 @@ interface TeacherProps {
     first_name: string;
     last_name: string;
     nickname: string;
-    phone: string;
+    phone_number: string;
     center_id: string;
     room_number: string;
   };
@@ -123,8 +123,8 @@ export default function TeacherCard({ teacher }: TeacherProps) {
         </div>
       </div>
 
-      {teacher.phone && (
-        <a href={`tel:${teacher.phone}`} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-4 rounded-[2rem] flex items-center justify-center gap-3 shadow-lg shadow-indigo-100 transition-all active:scale-95 mt-2">
+      {teacher.phone_number && (
+        <a href={`tel:${teacher.phone_number}`} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-4 rounded-[2rem] flex items-center justify-center gap-3 shadow-lg shadow-indigo-100 transition-all active:scale-95 mt-2">
           <span className="text-lg">📞</span>
           <span className="font-black text-sm uppercase tracking-widest">ติดต่อครู{teacher.nickname}</span>
         </a>

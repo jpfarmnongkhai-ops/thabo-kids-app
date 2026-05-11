@@ -23,7 +23,7 @@ export default function LoginPage() {
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
-      .eq("phone", username.trim())
+      .eq("phone_number", username.trim())
       .eq("password", password.trim())
       .single();
 
@@ -50,7 +50,7 @@ export default function LoginPage() {
       }
       else {
         // ระดับ 1: อื่นๆ/นักเรียน
-        router.push("/profile");
+       router.push("/students/profiles");
       }
     }
     setLoading(false);

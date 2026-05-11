@@ -1,10 +1,15 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+
 export default function AddStudentPage() {
   const [dbTeachers, setDbTeachers] = useState<any[]>([]);
+  const [id10, setId10] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ✅ 1. เพิ่มตัวแปรนี้กลับเข้าไปให้ถูกต้อง (สาเหตุที่ Error)
   const roomOptions = [
     { label: "เลือกห้องเรียน", value: "00" },
     { label: "เด็กเล็ก 1/1", value: "11" },
@@ -15,7 +20,7 @@ export default function AddStudentPage() {
 
   const [formData, setFormData] = useState({
     year: "69",
-    center: "01", // รหัสตั้งต้น
+    center: "01",
     room: "11",
     gender: "01",
     sequence: "01",
@@ -24,12 +29,12 @@ export default function AddStudentPage() {
     nickname: "",
     teacherName: "",
     allergies: "ไม่มี",
-    parentPhone: "",
+    phone_number: "",
   });
 
-  const [id10, setId10] = useState("");
+  // ... (โค้ด useEffect และ handleSubmit เหมือนเดิมที่ผมให้ไปล่าสุดได้เลยครับ)
 
-  // --- 🚀 ดึงข้อมูลครูจาก Supabase ---
+  // --- 🚀 ดึงข้อมูลครู ---
   useEffect(() => {
     const fetchTeachers = async () => {
       const { data } = await supabase
@@ -41,145 +46,190 @@ export default function AddStudentPage() {
     fetchTeachers();
   }, []);
 
-  // --- 🛠️ Logic การสร้างรหัส 10 หลัก (งานละเอียด) ---
+  // --- 🛠️ รันเลข 10 หลัก ---
   useEffect(() => {
-    // กรณีเป็นศูนย์เพิ่มเติม (11) เราจะใช้รหัส "01" ในส่วนของ ID10 แต่ Dashboard จะรู้ว่าเป็น (เพิ่มเติม) จากค่า center_id
-    // หรือคุณพ่อจะใช้ "11" ตรงๆ ในรหัส 10 หลักเลยก็ได้ครับ (ในที่นี้อิงตาม formData.center)
     setId10(`${formData.year}${formData.center}${formData.room}${formData.gender}${formData.sequence}`);
   }, [formData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.room === "00") return alert("กรุณาเลือกห้องเรียน");
-    if (!formData.teacherName) return alert("กรุณาเลือกครูประจำชั้น");
+    if (formData.room === "00") return alert("❌ กรุณาเลือกห้องเรียน");
+    if (!formData.teacherName) return alert("❌ กรุณาเลือกครูประจำชั้น");
 
-    // เตรียมค่า center_id สำหรับบันทึก (แปลง 11 เป็น 01_extra เพื่อให้ Dashboard อ่านง่าย)
+    setIsSubmitting(true);
+
     const finalCenterId = formData.center === "11" ? "01_extra" : formData.center;
+    const cleanPhone = formData.phone_number.trim().replace(/-/g, "");
 
-    const { error } = await supabase.from("students").insert([{
-      student_id_10: id10,
-      first_name: formData.firstName,
-      last_name: formData.lastName,
-      nickname: formData.nickname,
-      center_id: finalCenterId, // บันทึกเป็น 01, 02 หรือ 01_extra
-      room_number: formData.room,
-      gender_code: formData.gender,
-      teacher_name: formData.teacherName,
-      allergies: formData.allergies,
-      parent_phone: formData.parentPhone,
-    }]);
+    try {
+      // 1. บันทึกข้อมูลลงตาราง students (ดึง ID UUID กลับมา)
+      const { data: newStudent, error: studentError } = await supabase
+        .from("students")
+        .insert([{
+          student_id_10: id10,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          nickname: formData.nickname,
+          center_id: finalCenterId,
+          room_number: formData.room,
+          gender_code: formData.gender,
+          teacher_name: formData.teacherName,
+          allergies: formData.allergies,
+          phone_number: cleanPhone
+        }])
+        .select()
+        .single();
 
-    if (error) {
-      alert("เกิดข้อผิดพลาด: " + error.message);
-    } else {
-      alert("✅ บันทึกข้อมูลเรียบร้อยแล้ว!\nรหัสประจำตัว: " + id10);
+      if (studentError) throw studentError;
+
+      // 2. บันทึกโปรไฟล์ (ใช้ UUID จาก Step 1)
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .insert([{
+          id: newStudent.id,
+          phone_number: cleanPhone,
+          password: "123456",
+          role: "student",
+          display_name: formData.nickname,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          center_id: finalCenterId,
+          is_first_login: true
+        }]);
+
+      if (profileError) throw profileError;
+
+      alert(`✅ ลงทะเบียน "น้อง${formData.nickname}" สำเร็จ!`);
+      
+      // ล้างฟอร์ม
       setFormData({ 
         ...formData, 
         firstName: "", 
         lastName: "", 
         nickname: "", 
-        parentPhone: "",
+        phone_number: "",
         sequence: String(Number(formData.sequence) + 1).padStart(2, "0") 
       });
+
+    } catch (error: any) {
+      console.error(error);
+      alert("เกิดข้อผิดพลาด: " + error.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FF69B4]/5 via-[#BA55D3]/5 to-[#DDA0DD]/5 p-6 flex justify-center items-center font-sans">
-      <div className="max-w-md w-full bg-white p-8 rounded-[2.5rem] shadow-2xl border-2 border-white">
+    <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-10 flex justify-center items-center font-sans">
+      <div className="max-w-xl w-full bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-slate-100 overflow-hidden">
         
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-black bg-gradient-to-r from-[#FF69B4] to-[#BA55D3] bg-clip-text text-transparent">
-            ลงทะเบียนนักเรียนใหม่
-          </h2>
-          <p className="text-slate-400 text-xs mt-1 font-bold tracking-widest uppercase">Thabo CMS Entry Form</p>
-        </div>
-        
-        {/* รหัส 10 หลักโชว์สวยๆ */}
-        <div className="bg-slate-50 rounded-2xl py-5 text-center mb-6 border border-slate-100 shadow-inner">
-          <p className="text-sm font-black text-slate-500 uppercase tracking-wide mb-1">รหัสประจำตัวนักเรียน</p>
-          <p className="font-mono text-2xl font-medium text-slate-600 tracking-widest">{id10}</p>
+        {/* Header ส่วนบนสุดแบบเท่ๆ */}
+        <div className="bg-gradient-to-r from-[#6366F1] to-[#A855F7] p-8 text-white text-center relative">
+          <div className="absolute top-4 right-6 text-white/20 text-4xl font-black italic">THABO</div>
+          <h2 className="text-3xl font-black tracking-tight">ลงทะเบียนนักเรียน</h2>
+          <p className="text-indigo-100 text-sm mt-1 font-medium opacity-80">ระบบบริหารจัดการศูนย์พัฒนาเด็กเล็ก</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-             <input placeholder="ชื่อจริง" className="border-2 border-slate-50 bg-slate-50 p-3 rounded-xl w-full outline-none focus:border-[#BA55D3] focus:bg-white transition-all text-sm font-medium" required 
-               value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
-             <input placeholder="นามสกุล" className="border-2 border-slate-50 bg-slate-50 p-3 rounded-xl w-full outline-none focus:border-[#BA55D3] focus:bg-white transition-all text-sm font-medium" required 
-               value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
+        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          
+          {/* Badge รหัสประจำตัวแบบเก๋ๆ */}
+          <div className="flex justify-center -mt-14">
+            <div className="bg-white px-6 py-3 rounded-2xl shadow-xl border border-indigo-50 text-center">
+              <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em]">Student ID (10-Digit)</span>
+              <span className="text-2xl font-mono font-bold text-slate-800 tracking-widest">{id10}</span>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <input type="text" placeholder="ชื่อเล่น" className="border-2 border-slate-50 bg-slate-50 p-3 rounded-xl w-full outline-none focus:border-[#BA55D3] focus:bg-white transition-all text-sm font-medium" required
-              value={formData.nickname} onChange={e => setFormData({...formData, nickname: e.target.value})} />
-            <input type="text" placeholder="เบอร์โทรผู้ปกครอง" className="border-2 border-slate-50 bg-slate-50 p-3 rounded-xl w-full outline-none focus:border-[#FF69B4] focus:bg-white transition-all text-sm font-medium" required
-              value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: e.target.value})} />
+          <div className="space-y-4 pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 ml-2">ชื่อจริง</label>
+                <input placeholder="กรอกชื่อจริง" className="w-full bg-slate-50 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-400 transition-all font-medium text-slate-700" required 
+                  value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 ml-2">นามสกุล</label>
+                <input placeholder="กรอกนามสกุล" className="w-full bg-slate-50 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-400 transition-all font-medium text-slate-700" required 
+                  value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 ml-2">ชื่อเล่น</label>
+                <input placeholder="ชื่อเล่น" className="w-full bg-slate-50 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-400 transition-all font-medium text-slate-700" required
+                  value={formData.nickname} onChange={e => setFormData({...formData, nickname: e.target.value})} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 ml-2">เบอร์โทรผู้ปกครอง</label>
+                <input type="tel" placeholder="08x-xxx-xxxx" className="w-full bg-slate-50 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-400 transition-all font-medium text-slate-700" required
+                  value={formData.phone_number} onChange={e => setFormData({...formData, phone_number: e.target.value})} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 ml-2">ศูนย์พัฒนาเด็กเล็ก</label>
+                <select className="w-full bg-slate-50 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-400 font-medium text-slate-600 appearance-none" 
+                  value={formData.center} onChange={e => setFormData({...formData, center: e.target.value})}>
+                  <option value="01">ศูนย์ 1 ท่าเสด็จ</option>
+                  <option value="11">ศูนย์ 1 (เพิ่มเติม)</option>
+                  <option value="02">ศูนย์ 2 บ้านน้ำโมง</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 ml-2">ห้องเรียน</label>
+                <select className="w-full bg-slate-50 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-400 font-medium text-slate-600 appearance-none" 
+                  value={formData.room} onChange={e => setFormData({...formData, room: e.target.value})}>
+                  {roomOptions.map((room) => (
+                    <option key={room.value} value={room.value}>{room.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 ml-2">ครูประจำชั้น</label>
+                <select className="w-full bg-slate-50 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-400 font-medium text-slate-600 appearance-none"
+                  value={formData.teacherName} onChange={e => setFormData({...formData, teacherName: e.target.value})} required>
+                  <option value="">เลือกครูประจำชั้น</option>
+                  {dbTeachers.map((teacher, index) => (
+                    <option key={index} value={`${teacher.first_name} ${teacher.last_name}`}>
+                      ครู{teacher.nickname || teacher.first_name} ({teacher.first_name})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 ml-2">ลำดับนักเรียน</label>
+                <input placeholder="01" className="w-full bg-slate-50 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-400 font-medium text-slate-700 text-center" 
+                  value={formData.sequence} onChange={e => setFormData({...formData, sequence: e.target.value})} />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-indigo-500 ml-2 uppercase">แพ้อาหาร/โรคประจำตัว</label>
+              <textarea placeholder="ระบุข้อมูลสำคัญ..." className="w-full bg-slate-50 p-4 rounded-2xl h-24 outline-none focus:ring-2 focus:ring-indigo-400 font-medium text-slate-700 resize-none" 
+                value={formData.allergies} onChange={e => setFormData({...formData, allergies: e.target.value})} />
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <select className="w-full border-2 border-slate-50 bg-slate-50 p-3 rounded-xl outline-none focus:border-[#BA55D3] text-sm font-medium text-slate-500 cursor-pointer" 
-              value={formData.center} onChange={e => setFormData({...formData, center: e.target.value})}>
-              <option value="01">ศูนย์ 1 ท่าเสด็จ</option>
-              <option value="11">ศูนย์ 1 (เพิ่มเติม)</option> {/* ปรับชื่อตามที่คุณพ่อต้องการ */}
-              <option value="02">ศูนย์ 2 บ้านน้ำโมง</option>
-            </select>
-            
-            <select className="w-full border-2 border-slate-50 bg-slate-50 p-3 rounded-xl outline-none focus:border-[#BA55D3] text-sm font-medium text-slate-500 cursor-pointer" 
-              value={formData.room} onChange={e => setFormData({...formData, room: e.target.value})}>
-              {roomOptions.map((room) => (
-                <option key={room.value} value={room.value}>{room.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <select className="w-full border-2 border-slate-50 bg-slate-50 p-3 rounded-xl outline-none focus:border-[#BA55D3] text-sm font-medium text-slate-500 cursor-pointer" 
-              value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})}>
-              <option value="01">เด็กชาย</option>
-              <option value="02">เด็กหญิง</option>
-            </select>
-            
-            <select 
-              className="w-full border-2 border-slate-50 bg-slate-50 p-3 rounded-xl outline-none focus:border-[#DDA0DD] focus:bg-white transition-all text-sm font-medium text-slate-500 cursor-pointer"
-              value={formData.teacherName}
-              onChange={e => setFormData({...formData, teacherName: e.target.value})}
-              required
-            >
-              <option value="">เลือกครูประจำชั้น</option>
-              {dbTeachers.map((teacher, index) => (
-                <option key={index} value={`${teacher.first_name} ${teacher.last_name}`}>
-                  ครู{teacher.nickname || teacher.first_name} ({teacher.first_name})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-1">
-            <input placeholder="ลำดับที่ (เช่น 01, 02)" className="border-2 border-slate-50 bg-slate-50 p-3 rounded-xl w-full text-center outline-none focus:border-[#BA55D3] focus:bg-white transition-all text-sm font-medium text-slate-700" 
-              value={formData.sequence} onChange={e => setFormData({...formData, sequence: e.target.value})} />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-black text-[#BA55D3] ml-2 uppercase tracking-tighter">แพ้อาหาร/โรคประจำตัว</label>
-            <textarea 
-              placeholder="ระบุข้อมูล (ถ้าไม่มีให้ใส่ว่า - )" 
-              className="w-full border-2 border-slate-50 bg-slate-50 p-3 rounded-xl h-16 outline-none focus:border-[#DDA0DD] focus:bg-white transition-all text-sm font-medium text-slate-700 shadow-inner" 
-              value={formData.allergies} 
-              onChange={e => setFormData({...formData, allergies: e.target.value})} 
-            />
-          </div>
-
-          <button type="submit" className="w-full bg-gradient-to-r from-[#FF69B4] to-[#BA55D3] text-white p-4 rounded-2xl font-black text-lg hover:shadow-lg hover:translate-y-[-2px] transition-all mt-2 shadow-lg shadow-pink-100">
-            ลงทะเบียนนักเรียน
+          <button 
+            type="submit" 
+            disabled={isSubmitting}
+            className={`w-full py-5 rounded-[2rem] font-black text-xl text-white shadow-xl transition-all active:scale-95 ${
+              isSubmitting ? 'bg-slate-400' : 'bg-gradient-to-r from-[#6366F1] to-[#A855F7] hover:shadow-indigo-200'
+            }`}
+          >
+            {isSubmitting ? "กำลังบันทึก..." : "ยืนยันการลงทะเบียน"}
           </button>
           
-        
-          <div className="flex justify-center mt-6">
-              <Link href="/" className="p-3 bg-slate-100 rounded-full hover:bg-[#FFDAC1] transition-colors shadow-inner flex items-center justify-center w-12 h-12 text-xl">
-                🏠
-              </Link>
+          <div className="text-center pt-2">
+            <Link href="/" className="text-slate-400 hover:text-indigo-500 text-sm font-bold transition-colors">
+              กลับหน้าหลัก
+            </Link>
           </div>
-          
         </form>
       </div>
     </div>

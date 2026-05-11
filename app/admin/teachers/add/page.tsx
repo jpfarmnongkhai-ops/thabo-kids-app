@@ -15,7 +15,7 @@ export default function AddTeacherPage() {
     first_name: "",
     last_name: "",
     nickname: "",
-    phone: "",
+    phone_number: "",
     center_id: "01",
     room_number: "11", // กำหนดค่าเริ่มต้นเป็นเด็กเล็ก 1/1
     avatar_url: ""
@@ -51,28 +51,36 @@ export default function AddTeacherPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loading) return; // ป้องกันการกดซ้ำ
+    if (loading) return; 
     setLoading(true);
 
     try {
-      // 0. เตรียมข้อมูลให้สะอาด (ตัดช่องว่างเบอร์โทร)
-      const cleanPhone = formData.phone.trim().replace(/-/g, "");
+      const cleanPhone = formData.phone_number.trim().replace(/-/g, "");
       
-      // 1. เพิ่มข้อมูลลงตาราง teachers
-      const { error: teacherError } = await supabase
+      // 1. เพิ่มข้อมูลครู และดึง 'id' ที่ระบบสร้างให้อัตโนมัติกลับมา
+      const { data: newTeacher, error: teacherError } = await supabase
         .from("teachers")
         .insert([{
-          ...formData,
-          phone: cleanPhone // ใช้เบอร์ที่สะอาดแล้ว
-        }]);
+          prefix: formData.prefix,
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          nickname: formData.nickname,
+          phone_number: cleanPhone,
+          center_id: formData.center_id,
+          room_number: formData.room_number,
+          avatar_url: formData.avatar_url || ""
+        }])
+        .select("id") // สำคัญมาก: สั่งให้ส่งค่า ID กลับมา
+        .single();
 
-      if (teacherError) throw new Error(`ข้อมูลครู: ${teacherError.message}`);
+      if (teacherError) throw new Error(`บันทึกข้อมูลครูไม่สำเร็จ: ${teacherError.message}`);
 
-      // 2. สร้าง Account ในตาราง profiles อัตโนมัติ
+      // 2. ใช้ ID จากครูที่เพิ่งสร้าง มาสร้าง Profile ล็อกอิน
       const { error: profileError } = await supabase
         .from("profiles")
         .insert([{
-          phone: cleanPhone,
+          id: newTeacher.id, // ใช้ ID เดียวกันเพื่อให้ Table Join กันได้
+          phone_number: cleanPhone,
           password: "123456", 
           display_name: formData.nickname,
           first_name: formData.first_name,
@@ -80,16 +88,11 @@ export default function AddTeacherPage() {
           role: "teacher"
         }]);
 
-      if (profileError) {
-        // กรณีบันทึกครูสำเร็จแต่ Profile พัง (เช่น เบอร์โทรซ้ำใน Profiles)
-        console.error("Profile Error:", profileError.message);
-        throw new Error(`สร้างบัญชีไม่สำเร็จ: ${profileError.message}`);
-      }
+      if (profileError) throw new Error(`สร้างบัญชีไม่สำเร็จ: ${profileError.message}`);
 
-      // ถ้าผ่านหมดทั้งคู่
-      alert("ยินดีต้อนรับบุคลากรใหม่เข้าสู่ ThaBo Kids System ครับ! ✨");
+      alert("บันทึกข้อมูลบุคลากรใหม่เรียบร้อยแล้วครับ! ✨");
       router.push("/admin/teachers");
-      router.refresh(); // บังคับให้หน้าลิสต์อัปเดตข้อมูลใหม่ทันที
+      router.refresh();
 
     } catch (error: any) {
       alert("เกิดข้อผิดพลาด: " + error.message);
@@ -130,12 +133,7 @@ export default function AddTeacherPage() {
                 <option value="นาย">นาย</option>
               </select>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-[12px] font-black text-slate-400 uppercase tracking-widest ml-2">Nickname / ชื่อเล่น</label>
-              <input type="text" placeholder="เช่น ครูดา" className="w-full p-5 bg-white rounded-2xl font-bold text-slate-700 shadow-inner border-0 focus:ring-4 focus:ring-pink-100 transition-all placeholder:text-slate-300" value={formData.nickname} onChange={(e) => setFormData({...formData, nickname: e.target.value})} required />
-            </div>
-
+            
             <div className="space-y-2">
               <label className="text-[12px] font-black text-slate-400 uppercase tracking-widest ml-2">First Name / ชื่อจริง</label>
               <input type="text" className="w-full p-5 bg-white rounded-2xl font-bold text-slate-700 shadow-inner border-0 focus:ring-4 focus:ring-emerald-100 transition-all" value={formData.first_name} onChange={(e) => setFormData({...formData, first_name: e.target.value})} required />
@@ -144,6 +142,11 @@ export default function AddTeacherPage() {
             <div className="space-y-2">
               <label className="text-[12px] font-black text-slate-400 uppercase tracking-widest ml-2">Last Name / นามสกุล</label>
               <input type="text" className="w-full p-5 bg-white rounded-2xl font-bold text-slate-700 shadow-inner border-0 focus:ring-4 focus:ring-emerald-100 transition-all" value={formData.last_name} onChange={(e) => setFormData({...formData, last_name: e.target.value})} required />
+            <div className="space-y-2">
+              <label className="text-[12px] font-black text-slate-400 uppercase tracking-widest ml-2">Nickname / ชื่อเล่น</label>
+              <input type="text" placeholder="เช่น ครูดา" className="w-full p-5 bg-white rounded-2xl font-bold text-slate-700 shadow-inner border-0 focus:ring-4 focus:ring-pink-100 transition-all placeholder:text-slate-300" value={formData.nickname} onChange={(e) => setFormData({...formData, nickname: e.target.value})} required />
+            </div>
+
             </div>
 
             {/* เพิ่มช่องเลือกห้องเรียน */}
@@ -171,8 +174,8 @@ export default function AddTeacherPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[12px] font-black text-slate-400 uppercase tracking-widest ml-2">Phone / เบอร์โทรศัพท์</label>
-              <input type="tel" placeholder="08X-XXXXXXX" className="w-full p-5 bg-white rounded-2xl font-bold text-slate-700 shadow-inner border-0 focus:ring-4 focus:ring-amber-100 transition-all placeholder:text-slate-300" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} required />
+              <label className="text-[12px] font-black text-slate-400 uppercase tracking-widest ml-2">phone number/ เบอร์โทรศัพท์</label>
+              <input type="tel" placeholder="08X-XXXXXXX" className="w-full p-5 bg-white rounded-2xl font-bold text-slate-700 shadow-inner border-0 focus:ring-4 focus:ring-amber-100 transition-all placeholder:text-slate-300" value={formData.phone_number} onChange={(e) => setFormData({...formData, phone_number: e.target.value})} required />
             </div>
 
           </div>
@@ -180,6 +183,7 @@ export default function AddTeacherPage() {
           <button type="submit" disabled={loading || uploading} className="w-full mt-12 p-6 bg-slate-900 text-white rounded-[2rem] font-black text-xl hover:bg-indigo-600 hover:-translate-y-1 transition-all shadow-2xl shadow-indigo-200 disabled:bg-slate-200">
             {loading ? "กำลังจัดทำประวัติ..." : "ยืนยันการเพิ่มบุคลากร 🚀"}
           </button>
+
         </form>
 
         <div className="mt-10 text-center">

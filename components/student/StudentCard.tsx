@@ -14,7 +14,7 @@ interface StudentProps {
     teacher_name: string;    
     allergies: string;       
     medical_note?: string;   
-    parent_phone?: string;   
+    phone_number?: string;   
   };
 }
 
@@ -148,8 +148,8 @@ export default function StudentCard({ student }: StudentProps) {
         </div>
       </div>
 
-      {student.parent_phone && (
-        <a href={`tel:${student.parent_phone}`} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-[2rem] flex items-center justify-center gap-3 shadow-lg shadow-emerald-200 transition-all active:scale-95">
+      {student.phone_number && (
+        <a href={`tel:${student.phone_number}`} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-[2rem] flex items-center justify-center gap-3 shadow-lg shadow-emerald-200 transition-all active:scale-95">
           <span className="text-lg">📞</span>
           <span className="font-black text-sm uppercase tracking-widest">โทรหาผู้ปกครอง</span>
         </a>
