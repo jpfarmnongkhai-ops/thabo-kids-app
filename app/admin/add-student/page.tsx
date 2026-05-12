@@ -34,17 +34,21 @@ export default function AddStudentPage() {
 
   // ... (โค้ด useEffect และ handleSubmit เหมือนเดิมที่ผมให้ไปล่าสุดได้เลยครับ)
 
-  // --- 🚀 ดึงข้อมูลครู ---
-  useEffect(() => {
-    const fetchTeachers = async () => {
-      const { data } = await supabase
-        .from("teachers")
-        .select("first_name, last_name, nickname")
-        .order("first_name", { ascending: true });
-      if (data) setDbTeachers(data);
-    };
-    fetchTeachers();
-  }, []);
+  // ดึงข้อมูลครูเฉพาะห้องที่เลือก
+useEffect(() => {
+  const fetchTeachersByRoom = async () => {
+    if (!formData.room || formData.room === "00") return;
+
+    const { data } = await supabase
+      .from("teachers")
+      .select("first_name, last_name, nickname")
+      .eq("room_number", formData.room) // กรองเฉพาะครู 3 คนในห้องนี้
+      .order("first_name", { ascending: true });
+
+    if (data) setDbTeachers(data);
+  };
+  fetchTeachersByRoom();
+}, [formData.room]); // ทำงานทุกครั้งที่เปลี่ยนห้อง
 
   // --- 🛠️ รันเลข 10 หลัก ---
   useEffect(() => {
@@ -57,12 +61,10 @@ export default function AddStudentPage() {
     if (!formData.teacherName) return alert("❌ กรุณาเลือกครูประจำชั้น");
 
     setIsSubmitting(true);
-
-    const finalCenterId = formData.center === "11" ? "01_extra" : formData.center;
     const cleanPhone = formData.phone_number.trim().replace(/-/g, "");
 
     try {
-      // 1. บันทึกข้อมูลลงตาราง students (ดึง ID UUID กลับมา)
+      // 1. บันทึกข้อมูลลงตาราง students
       const { data: newStudent, error: studentError } = await supabase
         .from("students")
         .insert([{
@@ -70,7 +72,7 @@ export default function AddStudentPage() {
           first_name: formData.firstName,
           last_name: formData.lastName,
           nickname: formData.nickname,
-          center_id: finalCenterId,
+          center_id: formData.center, // ✅ ส่งค่าตรงๆ (เช่น "11") ตามตาราง centers
           room_number: formData.room,
           gender_code: formData.gender,
           teacher_name: formData.teacherName,
@@ -82,7 +84,7 @@ export default function AddStudentPage() {
 
       if (studentError) throw studentError;
 
-      // 2. บันทึกโปรไฟล์ (ใช้ UUID จาก Step 1)
+      // 2. บันทึกโปรไฟล์
       const { error: profileError } = await supabase
         .from("profiles")
         .insert([{
@@ -93,13 +95,14 @@ export default function AddStudentPage() {
           display_name: formData.nickname,
           first_name: formData.firstName,
           last_name: formData.lastName,
-          center_id: finalCenterId,
+          center_id: formData.center, // ✅ ส่งค่าตรงๆ เหมือนกันครับเพื่อน JP
           is_first_login: true
         }]);
 
       if (profileError) throw profileError;
 
       alert(`✅ ลงทะเบียน "น้อง${formData.nickname}" สำเร็จ!`);
+      // ... (ล้างฟอร์มเหมือนเดิม)
       
       // ล้างฟอร์ม
       setFormData({ 
