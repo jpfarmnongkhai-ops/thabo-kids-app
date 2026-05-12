@@ -15,44 +15,42 @@ export default function LoginPage() {
     setMounted(true);
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
+ const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    // 1. ตรวจสอบข้อมูลจากตาราง profiles โดยใช้ Phone เป็น Username
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("phone_number", username.trim())
-      .eq("password", password.trim())
-      .single();
+    // 1. ดึงข้อมูลแบบ Array (เอา .single ออกแล้ว)
+const { data: profiles, error } = await supabase
+  .from("profiles")
+  .select("*")
+  .eq("phone_number", username.trim())
+  .eq("password", password.trim());
 
-    if (error || !data) {
-      alert("⚠️ ACCESS DENIED: รหัสผ่านหรือเบอร์โทรไม่ถูกต้อง!");
+if (error || !profiles || profiles.length === 0) {
+  alert("⚠️ ACCESS DENIED!");
+} else {
+  // 2. บันทึก Session หลัก
+  localStorage.setItem("user_session", JSON.stringify(profiles[0]));
+
+  const role = profiles[0].role?.toLowerCase();
+
+  if (role === "admin" || role === "super_admin" || role === "director" || role === "teacher") {
+    // แยกไปหน้า Admin/ครู ตามเดิม
+    if (role === "director") router.push("/admin/director");
+    else if (role === "teacher") router.push("/");
+    else router.push("/admin");
+  } else {
+    // ⚡ สำหรับนักเรียน (ฝั่ง Students):
+    if (profiles.length > 1) {
+      // 🏘️ เคสเด็กแฝด: เก็บทุกคนลง twin_profiles แล้วไปหน้าเลือก
+      localStorage.setItem("twin_profiles", JSON.stringify(profiles));
+      router.push("/select-student");
     } else {
-      // 2. บันทึก Session ลง LocalStorage
-      localStorage.setItem("user_session", JSON.stringify(data));
-
-      // 🚀 3. LOGIC แยกทางเดิน 5 ระดับ (ร่างทองฉบับสมบูรณ์)
-      const role = data.role?.toLowerCase();
-
-      if (role === "super_admin" || role === "admin") {
-        // ระดับ 4-5: JP & Admin ไปฐานบัญชาการ Sci-Fi
-        router.push("/admin"); 
-      } 
-      else if (role === "director") {
-        // ระดับ 3: ผอ. ไปหน้าสถิติ (ที่ซ่อนแชทไว้)
-        router.push("/admin/director");
-      } 
-      else if (role === "teacher") {
-        // ระดับ 2: คุณครู ไปหน้าจัดการเด็กปกติ
-        router.push("/"); 
-      }
-      else {
-        // ระดับ 1: อื่นๆ/นักเรียน
-       router.push("/students/profiles");
-      }
+      // 🚀 เคสน้องภูริ (คนเดียว): วิ่งตรงเข้า Dashboard (เติม s ที่ students ด้วยนะเพื่อน!)
+      router.push(`/students/dashboard/${profiles[0].id}`);
     }
+  }
+}
     setLoading(false);
   };
 

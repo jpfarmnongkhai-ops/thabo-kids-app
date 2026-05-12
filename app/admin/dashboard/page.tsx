@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 interface DashboardStats {
   total: number;
   thaSadet: number;
+  thaSadetExtra: number;
   namMong: number;
   attendanceToday: number;
 }
@@ -17,6 +18,7 @@ export default function AdminControlCenter() {
   const [stats, setStats] = useState<DashboardStats>({
     total: 0,
     thaSadet: 0,
+    thaSadetExtra:0,
     namMong: 0,
     attendanceToday: 0
   });
@@ -46,10 +48,11 @@ export default function AdminControlCenter() {
       ]);
 
       setStats({
-        total: totalRes.count || 0,
-        thaSadet: tsRes.count || 0,
-        namMong: nmRes.count || 0,
-        attendanceToday: 0 
+         total: 0,
+    thaSadet: 0,
+    thaSadetExtra:0,
+    namMong: 0,
+    attendanceToday: 0
       });
     };
 
@@ -81,13 +84,21 @@ export default function AdminControlCenter() {
           </button>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
-          <StatBox label="นักเรียนทั้งหมด" value={stats.total} bgColor="bg-[#BFDBFE]" textColor="text-blue-700" />
-          <StatBox label="ศูนย์ท่าเสด็จ" value={stats.thaSadet} bgColor="bg-[#BBF7D0]" textColor="text-emerald-700" />
-          <StatBox label="ศูนย์บ้านน้ำโมง" value={stats.namMong} bgColor="bg-[#FEF08A]" textColor="text-yellow-700" />
-          <StatBox label="มาเรียนวันนี้" value={stats.attendanceToday} bgColor="bg-[#FECACA]" textColor="text-red-700" />
-        </div>
+       {/* Quick Stats - ปรับให้แยก 3 ศูนย์ตามจริง */}
+<div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-12">
+  <StatBox label="นักเรียนทั้งหมด" value={stats.total} bgColor="bg-[#BFDBFE]" textColor="text-blue-700" />
+  
+  {/* แยกศูนย์ 1 */}
+  <StatBox label="ศูนย์ 1 ท่าเสด็จ" value={stats.thaSadet} bgColor="bg-[#BBF7D0]" textColor="text-emerald-700" />
+  
+  {/* แยกศูนย์ 1 (เพิ่มเติม) */}
+  <StatBox label="ศูนย์ 1 (เพิ่มเติม)" value={stats.thaSadetExtra} bgColor="bg-[#DCFCE7]" textColor="text-emerald-600" />
+  
+  {/* แยกศูนย์ 2 */}
+  <StatBox label="ศูนย์ 2 บ้านน้ำโมง" value={stats.namMong} bgColor="bg-[#FEF08A]" textColor="text-yellow-700" />
+  
+  <StatBox label="มาเรียนวันนี้" value={stats.attendanceToday} bgColor="bg-[#FECACA]" textColor="text-red-700" />
+</div>
 
         {/* Menu Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
