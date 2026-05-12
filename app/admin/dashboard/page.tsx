@@ -40,21 +40,24 @@ export default function AdminControlCenter() {
     }
 
     // 2. ดึงข้อมูลสถิติแบบขนาน (Parallel) เพื่อความรวดเร็ว
-    const fetchStats = async () => {
-      const [totalRes, tsRes, nmRes] = await Promise.all([
-        supabase.from("students").select("*", { count: 'exact', head: true }),
-        supabase.from("students").select("*", { count: 'exact', head: true }).eq("center_id", "01"),
-        supabase.from("students").select("*", { count: 'exact', head: true }).eq("center_id", "02")
-      ]);
+    // 2. ดึงข้อมูลสถิติแบบขนาน (Parallel) เพื่อความรวดเร็ว
+const fetchStats = async () => {
+  const [totalRes, tsRes, tsExtraRes, nmRes] = await Promise.all([
+    supabase.from("students").select("*", { count: 'exact', head: true }),
+    supabase.from("students").select("*", { count: 'exact', head: true }).eq("center_id", "01"),
+    supabase.from("students").select("*", { count: 'exact', head: true }).eq("center_id", "11"),
+    supabase.from("students").select("*", { count: 'exact', head: true }).eq("center_id", "02")
+  ]);
 
-      setStats({
-         total: 0,
-    thaSadet: 0,
-    thaSadetExtra:0,
-    namMong: 0,
-    attendanceToday: 0
-      });
-    };
+  // ✅ ต้องหยิบค่า .count จากแต่ละตัวมาเซตแบบนี้ครับเพื่อน!
+  setStats({
+    total: totalRes.count || 0,
+    thaSadet: tsRes.count || 0,
+    thaSadetExtra: tsExtraRes.count || 0,
+    namMong: nmRes.count || 0,
+    attendanceToday: 0 // ส่วนนี้ต้องรอทำระบบเช็คชื่อก่อนครับ
+  });
+};
 
     fetchStats();
   }, [router]);
