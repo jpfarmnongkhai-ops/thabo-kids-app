@@ -37,45 +37,50 @@ export default function AdminControlCenter() {
     } catch (e) { router.push("/admin/login"); }
 
     const fetchData = async () => {
-  // --- 1. เตรียมวันที่ให้ตรงกับที่บันทึกในหน้าเช็คชื่อ ---
   const today = new Date().toISOString().split('T')[0];
 
-  // --- 2. ดึงข้อมูลสถิตินักเรียน (ส่วนเดิมของเพื่อน) ---
+  // 1. ดึงข้อมูลนักเรียนทั้งหมด (ใช้สำหรับ HUD ด้านขวา)
   const { data: allStudents } = await supabase.from("students").select("*");
   if (allStudents) setStudents(allStudents);
 
+  // 2. ปรับฟังก์ชัน getStats ให้เช็ค "gender_code" ตามจริง
   const getStats = async (centerId?: string) => {
-    let baseQuery = supabase.from("students").select("*", { count: 'exact', head: true });
-    if (centerId) baseQuery = baseQuery.eq("center_id", centerId);
+    // กำหนดเงื่อนไขพื้นฐาน
+    let matchQuery: any = {};
+    if (centerId) matchQuery.center_id = centerId;
 
+    // ดึง 3 ค่าพร้อมกัน: ทั้งหมด, ชาย (01), หญิง (02)
     const [all, male, female] = await Promise.all([
-      baseQuery,
-      supabase.from("students").select("*", { count: 'exact', head: true }).eq("gender", "ชาย").match(centerId ? {center_id: centerId} : {}),
-      supabase.from("students").select("*", { count: 'exact', head: true }).eq("gender", "หญิง").match(centerId ? {center_id: centerId} : {})
+      supabase.from("students").select("*", { count: 'exact', head: true }).match(matchQuery),
+      supabase.from("students").select("*", { count: 'exact', head: true }).match({ ...matchQuery, gender_code: "01" }), // ใช้ gender_code: "01"
+      supabase.from("students").select("*", { count: 'exact', head: true }).match({ ...matchQuery, gender_code: "02" })  // ใช้ gender_code: "02"
     ]);
-    return { all: all.count || 0, male: male.count || 0, female: female.count || 0 };
+
+    return { 
+      all: all.count || 0, 
+      male: male.count || 0, 
+      female: female.count || 0 
+    };
   };
 
-  // 🔥 3. เพิ่มการนับจำนวนคนมาเรียนวันนี้ (Query จากตาราง attendance)
+  // 3. ดึงสถิติของทุกศูนย์
   const [total, ts, tsExtra, nm, attendanceCount] = await Promise.all([
     getStats(),
     getStats("01"),
     getStats("11"),
     getStats("02"),
-    // นับเฉพาะสถานะ 'present' และ 'late' ตามที่เพื่อนเขียนไว้ในหน้าเช็คชื่อ
     supabase.from("attendance")
       .select("*", { count: 'exact', head: true })
       .eq("check_date", today)
       .in("status", ["present", "late"]) 
   ]);
 
-  // --- 4. อัปเดตค่าเข้า Stats (เปลี่ยนจาก 0 เป็น attendanceCount.count) ---
   setStats({ 
     total, 
     thaSadet: ts, 
     thaSadetExtra: tsExtra, 
     namMong: nm, 
-    attendanceToday: attendanceCount.count || 0 // 🔥 แก้ตรงนี้ครับ!
+    attendanceToday: attendanceCount.count || 0 
   });
 };
 

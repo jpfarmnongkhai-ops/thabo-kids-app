@@ -10,7 +10,6 @@ export default function AddStudentPage() {
   const [id10, setId10] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ✅ ฟังก์ชันตัวแปรตามที่เพื่อนขอเป๊ะๆ
   const getCenterFullName = (id: string) => {
     const names: any = { 
       "01": "ศูนย์ 1 ท่าเสด็จ", 
@@ -43,7 +42,7 @@ export default function AddStudentPage() {
     year: "69",
     center: "01",
     room: "11",
-    gender: "01",
+    gender: "01", // 01=ชาย, 02=หญิง
     sequence: "01",
     firstName: "",
     lastName: "",
@@ -53,21 +52,31 @@ export default function AddStudentPage() {
     phone_number: "",
   });
 
-  // ดึงข้อมูลครูตามห้องที่เลือก
   useEffect(() => {
-    const fetchTeachersByRoom = async () => {
-      if (!formData.room || formData.room === "00") return;
-      const { data } = await supabase
-        .from("teachers")
-        .select("*")
-        .eq("room_number", formData.room)
-        .order("first_name", { ascending: true });
-      if (data) setDbTeachers(data);
-    };
-    fetchTeachersByRoom();
-  }, [formData.room]);
+  const fetchTeachersByFilter = async () => {
+    // ถ้ายังไม่เลือกห้อง ไม่ต้องดึงข้อมูล
+    if (formData.room === "00") {
+      setDbTeachers([]);
+      return;
+    }
 
-  // สร้าง ID 10 หลักอัตโนมัติ
+    const { data } = await supabase
+      .from("teachers")
+      .select("*")
+      .eq("center_id", formData.center) // แยกศูนย์
+      .eq("room_number", formData.room) // แยกห้อง
+      .order("first_name", { ascending: true });
+
+    if (data) setDbTeachers(data);
+  };
+
+  fetchTeachersByFilter();
+  
+  // ล้างค่าครูที่เลือกไว้ก่อนหน้า เมื่อมีการเปลี่ยนศูนย์หรือห้อง
+  setFormData(prev => ({ ...prev, teacherName: "" }));
+  setSelectedTeacherData(null);
+}, [formData.center, formData.room]); // ทำงานใหม่เมื่อ 'ศูนย์' หรือ 'ห้อง' เปลี่ยน
+
   useEffect(() => {
     setId10(`${formData.year}${formData.center}${formData.room}${formData.gender}${formData.sequence}`);
   }, [formData]);
@@ -81,7 +90,6 @@ export default function AddStudentPage() {
     const cleanPhone = formData.phone_number.trim().replace(/-/g, "");
 
     try {
-      // 1. บันทึกข้อมูลนักเรียน (พร้อมดึงเบอร์โทรครูจาก State)
       const { data: newStudent, error: studentError } = await supabase
         .from("students")
         .insert([{
@@ -93,7 +101,7 @@ export default function AddStudentPage() {
           room_number: formData.room,
           gender_code: formData.gender,
           teacher_name: formData.teacherName,
-          teacher_phone: selectedTeacherData?.phone_number || "", // ✅ บันทึกเบอร์ครูที่เลือกไว้
+          teacher_phone: selectedTeacherData?.phone_number || "",
           allergies: formData.allergies,
           phone_number: cleanPhone
         }])
@@ -101,7 +109,6 @@ export default function AddStudentPage() {
 
       if (studentError) throw studentError;
 
-      // 2. บันทึกโปรไฟล์สำหรับ Login
       const { error: profileError } = await supabase
         .from("profiles")
         .insert([{
@@ -120,7 +127,6 @@ export default function AddStudentPage() {
 
       alert(`💖 ลงทะเบียน "น้อง${formData.nickname}" เรียบร้อยแล้วค่ะ!`);
       
-      // Reset Form และรันลำดับถัดไป
       setFormData({ 
         ...formData, 
         firstName: "", 
@@ -140,7 +146,6 @@ export default function AddStudentPage() {
     <div className="min-h-screen bg-[#FFF5F7] p-4 md:p-10 flex justify-center items-center font-sans text-slate-800">
       <div className="max-w-xl w-full bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(255,182,193,0.4)] border border-pink-50 overflow-hidden">
         
-        {/* Header Pink Modern Style */}
         <div className="bg-gradient-to-br from-[#FF6B95] via-[#FF85A1] to-[#A855F7] p-8 text-white text-center relative">
           <div className="absolute top-4 right-6 text-white/20 text-4xl font-black italic">THABO</div>
           <h2 className="text-3xl font-black tracking-tight">ลงทะเบียนลูกน้อย</h2>
@@ -150,7 +155,6 @@ export default function AddStudentPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-5">
-          {/* Student ID Badge */}
           <div className="flex justify-center -mt-14">
             <div className="bg-white px-7 py-3 rounded-2xl shadow-xl border border-pink-100 text-center">
               <span className="block text-[10px] font-bold text-pink-400 uppercase tracking-[0.2em]">Student Identity</span>
@@ -191,15 +195,27 @@ export default function AddStudentPage() {
                 value={formData.teacherName} 
                 onChange={e => {
                   const teacher = dbTeachers.find(t => `${t.first_name} ${t.last_name}` === e.target.value);
-                  setSelectedTeacherData(teacher); // เก็บข้อมูลครูเพื่อเอาเบอร์โทร
+                  setSelectedTeacherData(teacher);
                   setFormData({...formData, teacherName: e.target.value});
                 }} required>
-                <option value="">เลือกครูประจำชั้น</option>
-                {dbTeachers.map((t, i) => (
-                  <option key={i} value={`${t.first_name} ${t.last_name}`}>ครู{t.nickname} ({t.first_name})</option>
-                ))}
+                <option value="">{dbTeachers.length > 0 ? "เลือกครูประจำชั้น" : "--- ไม่พบรายชื่อครู ---"}</option>
+  {dbTeachers.map((t, i) => (
+    <option key={i} value={`${t.first_name} ${t.last_name}`}>
+      ครู{t.nickname} ({t.first_name})
+    </option>
+  ))}
+</select>
+              
+              {/* ✅ ช่องเลือกเพศที่เพิ่มเข้ามาใหม่ */}
+              <select className="bg-pink-50/40 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-pink-300 font-medium text-slate-600 appearance-none"
+                value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})}>
+                <option value="01">เพศชาย </option>
+                <option value="02">เพศหญิง </option>
               </select>
-              <input placeholder="ลำดับ" className="bg-pink-50/40 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-pink-300 font-medium text-center" 
+            </div>
+
+            <div className="grid grid-cols-1">
+               <input placeholder="ลำดับ (เช่น 01, 02)" className="bg-pink-50/40 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-pink-300 font-medium text-center" 
                 value={formData.sequence} onChange={e => setFormData({...formData, sequence: e.target.value})} />
             </div>
 
