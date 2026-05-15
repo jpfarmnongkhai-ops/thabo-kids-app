@@ -1,156 +1,223 @@
 'use client'
-import ExcelImporter from '@/components/ExcelImporter' // เพิ่มบรรทัดนี้ด้านบนสุด
+
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import ExcelImporter from '@/components/ExcelImporter'
+
+// กำหนดประเภทข้อมูลเพื่อลด Error (TypeScript)
+interface Student {
+  id: string;
+  first_name: string;
+  last_name: string;
+  nickname: string;
+}
+
+interface Template {
+  id: string;
+  criteria_label: string;
+  activity_type: string;
+  week_number?: number;
+  day_number?: number;
+}
 
 export default function AssessmentPage() {
-  const [students, setStudents] = useState([])
-  const [templates, setTemplates] = useState([]) // เก็บหัวข้อประเมิน
-  const [selectedTemplate, setSelectedTemplate] = useState('') // เก็บ id หัวข้อที่เลือก
-  const [selectedWeek, setSelectedWeek] = useState(1)
-  const [selectedDay, setSelectedDay] = useState(1)
-  const [loading, setLoading] = useState(true)
+  const [students, setStudents] = useState<Student[]>([])
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('')
+  const [selectedWeek, setSelectedWeek] = useState<number>(1)
+  const [selectedDay, setSelectedDay] = useState<number>(1)
+  const [loading, setLoading] = useState<boolean>(true)
 
-  // 1. ดึงข้อมูลนักเรียน และ หัวข้อประเมิน (Templates)
+  // 1. ดึงข้อมูลนักเรียนและหัวข้อประเมิน
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
-      
-      // ดึงรายชื่อนักเรียน
-      const { data: stdData } = await supabase
-        .from('students')
-        .select('id, first_name, last_name, nickname')
-        .order('id')
-      
-      // ดึงหัวข้อประเมินตามสัปดาห์และวันที่เลือก (จากตารางที่เราเพิ่งสร้าง)
-      const { data: tempData } = await supabase
-        .from('assessment_templates')
-        .select('id, criteria_label, activity_type')
-        .eq('week_number', selectedWeek)
-        .eq('day_number', selectedDay)
+      try {
+        // ดึงรายชื่อนักเรียน
+        const { data: stdData } = await supabase
+          .from('students')
+          .select('id, first_name, last_name, nickname')
+          .order('id')
 
-      setStudents(stdData || [])
-      setTemplates(tempData || [])
-      if (tempData?.length > 0) setSelectedTemplate(tempData[0].id)
-      setLoading(false)
+        // ดึงหัวข้อประเมิน (ฉบับปรับปรุง: ดึงมาทั้งหมดก่อนเพื่อความชัวร์)
+        const { data: tempData, error: tempError } = await supabase
+          .from('assessment_templates')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (tempError) throw tempError
+
+        setStudents(stdData || [])
+        
+        // กรองข้อมูลเบื้องต้นตามสัปดาห์/วันที่เลือก
+        const filteredTemplates = tempData?.filter(t => 
+          t.week_number === selectedWeek && t.day_number === selectedDay
+        ) || []
+
+        // ถ้ากรองแล้วไม่มี ให้โชว์ทั้งหมดไปก่อนเพื่อนจะได้เห็นข้อมูล (Smart Fallback)
+        const finalTemplates = filteredTemplates.length > 0 ? filteredTemplates : (tempData || [])
+        setTemplates(finalTemplates)
+
+        if (finalTemplates.length > 0) {
+          setSelectedTemplate(finalTemplates[0].id)
+        } else {
+          setSelectedTemplate('')
+        }
+      } catch (err) {
+        console.error('Fetch error:', err)
+      } finally {
+        setLoading(false)
+      }
     }
     fetchData()
-  }, [selectedWeek, selectedDay]) // เมื่อเปลี่ยนสัปดาห์หรือวัน ให้โหลดข้อมูลใหม่
+  }, [selectedWeek, selectedDay])
 
-  // 2. ฟังก์ชันบันทึกคะแนน
-  const handleSaveScore = async (studentId, score) => {
+  // 2. ฟังก์ชันบันทึกคะแนน (ปรับให้ลื่นไหลขึ้น)
+  const handleSaveScore = async (studentId: string, score: number) => {
     if (!selectedTemplate) {
-      alert('กรุณาเลือกหัวข้อประเมินก่อนครับเพื่อน!')
+      alert('กรุณาเลือกหัวข้อประเมินก่อนครับเพื่อน JP!')
       return
     }
 
-    const { error } = await supabase
-      .from('student_scores')
-      .upsert({ 
-        student_id: studentId, 
-        template_id: selectedTemplate, 
-        score_value: score
-      }, { onConflict: 'student_id,template_id' }) // ป้องกันข้อมูลซ้ำ
+    try {
+      const { error } = await supabase
+        .from('student_scores')
+        .upsert({ 
+          student_id: studentId, 
+          template_id: selectedTemplate, 
+          score_value: score,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'student_id,template_id' })
 
-    if (error) {
-      console.error('Error saving:', error)
-    } else {
-      // ทำ Effect เล็กๆ ให้รู้ว่าบันทึกแล้ว (เช่น เปลี่ยนสีปุ่มชั่วคราว)
-      console.log('Saved!')
+      if (error) throw error
+      console.log(`Saved score ${score} for student ${studentId}`)
+      // เพิ่มความเท่: เพื่อนสามารถทำ Notification เล็กๆ ตรงนี้ได้
+    } catch (err) {
+      console.error('Save error:', err)
+      alert('บันทึกไม่สำเร็จ ลองเช็กเน็ตดูนะเพื่อน!')
     }
   }
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow-md min-h-screen">
-      <h1 className="text-2xl font-bold mb-4 text-purple-700">บันทึกผลการประเมินหลังแผน</h1>
-      {/* 🚀 ติดตั้งเครื่องจักรนำเข้าตรงนี้ครับเพื่อน JP! */}
-      <ExcelImporter onComplete={() => window.location.reload()} />
-      
-      <div className="grid grid-cols-1 md:flex gap-4 mb-6 bg-purple-50 p-4 rounded-xl border border-purple-100">
-        <div>
-          <label className="block text-sm font-medium text-purple-600 mb-1">สัปดาห์ที่</label>
-          <select 
-            className="border-2 border-purple-200 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-            value={selectedWeek}
-            onChange={(e) => setSelectedWeek(Number(e.target.value))}
-          >
-            {[1, 2, 3, 4].map(w => <option key={w} value={w}>สัปดาห์ที่ {w}</option>)}
-          </select>
-        </div>
+    <div className="p-4 md:p-8 bg-slate-50 min-h-screen">
+      <div className="max-w-6xl mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-purple-100">
         
-        <div>
-          <label className="block text-sm font-medium text-purple-600 mb-1">วันที่สอน</label>
-          <div className="flex gap-2">
-            {[1, 2, 3, 4, 5].map(day => (
-              <button 
-                key={day}
-                onClick={() => setSelectedDay(day)}
-                className={`w-10 h-10 rounded-lg font-bold transition-all ${selectedDay === day ? 'bg-purple-600 text-white scale-110 shadow-lg' : 'bg-white text-purple-600 border border-purple-200'}`}
-              >
-                {day}
-              </button>
-            ))}
-          </div>
+        {/* Header ส่วนหัวสุดเจ๋ง */}
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 text-white text-center">
+          <h1 className="text-3xl font-extrabold tracking-tight">📊 ระบบบันทึกผลการประเมิน</h1>
+          <p className="opacity-90 mt-1">Municipality Child Development Center Dashboard</p>
         </div>
 
-        <div className="flex-1">
-          <label className="block text-sm font-medium text-purple-600 mb-1">หัวข้อที่ต้องการประเมิน (จากไฟล์ Excel)</label>
-          <select 
-            className="w-full border-2 border-purple-200 p-2 rounded-lg focus:outline-none"
-            value={selectedTemplate}
-            onChange={(e) => setSelectedTemplate(e.target.value)}
-          >
-            {templates.length > 0 ? (
-              templates.map(t => (
-                <option key={t.id} value={t.id}>[{t.activity_type}] {t.criteria_label}</option>
-              ))
-            ) : (
-              <option disabled>ยังไม่มีข้อมูลหัวข้อ (กรุณาเพิ่มในฐานข้อมูล)</option>
-            )}
-          </select>
+        <div className="p-6">
+          {/* ส่วนนำเข้าไฟล์ */}
+          <div className="mb-8">
+             <ExcelImporter onComplete={() => window.location.reload()} />
+          </div>
+
+          {/* แผงควบคุม (Filters) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8 bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100">
+            <div className="lg:col-span-2">
+              <label className="block text-sm font-bold text-indigo-700 mb-2 uppercase tracking-wider">สัปดาห์</label>
+              <select 
+                className="w-full bg-white border-2 border-indigo-200 p-3 rounded-xl focus:ring-4 focus:ring-indigo-200 outline-none transition-all font-semibold text-indigo-900"
+                value={selectedWeek}
+                onChange={(e) => setSelectedWeek(Number(e.target.value))}
+              >
+                {[1, 2, 3, 4, 34].map(w => <option key={w} value={w}>สัปดาห์ที่ {w}</option>)}
+              </select>
+            </div>
+            
+            <div className="lg:col-span-3">
+              <label className="block text-sm font-bold text-indigo-700 mb-2 uppercase tracking-wider">วันที่สอน</label>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map(day => (
+                  <button 
+                    key={day}
+                    onClick={() => setSelectedDay(day)}
+                    className={`flex-1 py-3 rounded-xl font-bold transition-all transform active:scale-95 ${selectedDay === day ? 'bg-indigo-600 text-white shadow-lg -translate-y-1' : 'bg-white text-indigo-600 border-2 border-indigo-200 hover:bg-indigo-100'}`}
+                  >
+                    {day}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="lg:col-span-7">
+              <label className="block text-sm font-bold text-indigo-700 mb-2 uppercase tracking-wider">หัวข้อการประเมินที่เลือก</label>
+              <select 
+                className="w-full bg-white border-2 border-indigo-200 p-3 rounded-xl focus:ring-4 focus:ring-indigo-200 outline-none transition-all font-medium text-gray-700"
+                value={selectedTemplate}
+                onChange={(e) => setSelectedTemplate(e.target.value)}
+              >
+                {templates.length > 0 ? (
+                  templates.map(t => (
+                    <option key={t.id} value={t.id}>
+                      🎯 [{t.activity_type || 'ทั่วไป'}] {t.criteria_label}
+                    </option>
+                  ))
+                ) : (
+                  <option disabled>❌ ยังไม่มีข้อมูลสัปดาห์นี้ (ลองเลือกสัปดาห์อื่นหรืออัปโหลด Excel)</option>
+                )}
+              </select>
+            </div>
+          </div>
+
+          {/* ส่วนแสดงตาราง */}
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-4"></div>
+              <p className="text-purple-600 font-bold text-lg animate-pulse">กำลังเรียกนักเรียนมาเข้าแถว... ฮ้าาาา</p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-gray-200 shadow-sm">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-800 text-white">
+                    <th className="p-5 font-semibold">ชื่อ-นามสกุล</th>
+                    <th className="p-5 font-semibold">ชื่อเล่น</th>
+                    <th className="p-5 text-center font-semibold">ระดับผลการประเมิน</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {students.map(std => (
+                    <tr key={std.id} className="hover:bg-purple-50/50 transition-colors">
+                      <td className="p-5">
+                        <div className="font-bold text-gray-800">{std.first_name} {std.last_name}</div>
+                      </td>
+                      <td className="p-5 text-gray-500 font-medium">{std.nickname}</td>
+                      <td className="p-5">
+                        <div className="flex justify-center gap-4">
+                          {[1, 2, 3].map(score => {
+                            const colors = [
+                              "", // dummy
+                              "border-red-500 text-red-600 hover:bg-red-500",
+                              "border-amber-500 text-amber-600 hover:bg-amber-500",
+                              "border-emerald-500 text-emerald-600 hover:bg-emerald-500"
+                            ];
+                            return (
+                              <button
+                                key={score}
+                                onClick={() => handleSaveScore(std.id, score)}
+                                className={`group relative w-12 h-12 rounded-2xl border-2 font-black transition-all hover:text-white hover:shadow-lg transform hover:-translate-y-1 active:scale-90 ${colors[score]}`}
+                              >
+                                {score}
+                                <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                  {score === 3 ? 'ดีมาก' : score === 2 ? 'พอใช้' : 'ปรับปรุง'}
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
-
-      {loading ? (
-        <p className="text-center py-10 text-purple-500">กำลังโหลดข้อมูลนักเรียน... ฮ้าาาา</p>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-purple-600 text-white">
-                <th className="p-4">ชื่อ-นามสกุล</th>
-                <th className="p-4">ชื่อเล่น</th>
-                <th className="p-4 text-center">ประเมินผล (1-3)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map(std => (
-                <tr key={std.id} className="border-b border-gray-100 hover:bg-purple-50 transition-colors">
-                  <td className="p-4 font-medium text-gray-700">{std.first_name} {std.last_name}</td>
-                  <td className="p-4 text-gray-600">{std.nickname}</td>
-                  <td className="p-4">
-                    <div className="flex justify-center gap-3">
-                      {[1, 2, 3].map(score => (
-                        <button
-                          key={score}
-                          onClick={() => handleSaveScore(std.id, score)}
-                          className={`w-10 h-10 rounded-full border-2 font-bold transition-all
-                            ${score === 3 ? 'border-green-500 text-green-600 hover:bg-green-500 hover:text-white' : ''}
-                            ${score === 2 ? 'border-yellow-500 text-yellow-600 hover:bg-yellow-500 hover:text-white' : ''}
-                            ${score === 1 ? 'border-red-500 text-red-600 hover:bg-red-500 hover:text-white' : ''}
-                          `}
-                        >
-                          {score}
-                        </button>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <p className="text-center mt-6 text-gray-400 text-sm">Powered by Gemini AI for Friend JP 💜</p>
     </div>
   )
 }

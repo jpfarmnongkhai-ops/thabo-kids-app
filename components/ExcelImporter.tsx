@@ -1,9 +1,9 @@
 'use client'
-import { useState } from 'react'
+import React, { useState } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
 
-export default function ExcelImporter({ onComplete }) {
+export default function ExcelImporter({ onComplete }: any) {
   const [uploading, setUploading] = useState(false)
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -12,38 +12,43 @@ export default function ExcelImporter({ onComplete }) {
 
     setUploading(true)
     const reader = new FileReader()
-    
+
     reader.onload = async (evt) => {
-      const bstr = evt.target?.result
-      const wb = XLSX.read(bstr, { type: 'binary' })
-      const wsname = wb.SheetNames[0]
-      const ws = wb.Sheets[wsname]
-      const data = XLSX.utils.sheet_to_json(ws)
+      try {
+        const bstr = evt.target?.result
+        const wb = XLSX.read(bstr, { type: 'binary' })
+        const wsname = wb.SheetNames[0]
+        const ws = wb.Sheets[wsname]
+        const data = XLSX.utils.sheet_to_json(ws)
 
-      // ตัวอย่างการ Map ข้อมูลจาก Excel เข้าสู่รูปแบบของ Supabase
-      // เพื่อน JP ปรับชื่อ Column ให้ตรงกับในไฟล์ Excel ของเพื่อนนะครับ
-      // แก้ไขส่วนการ Map ข้อมูลให้ยืดหยุ่นขึ้นครับเพื่อน JP
-const templatesToInsert = data.map((row: any) => ({
-  unit_name: row['หน่วย'] || 'วิทยาศาสตร์สร้างสรรค์', // ใช้ชื่อคอลัมน์ภาษาไทยตามไฟล์เพื่อน
-  week_number: parseInt(row['สัปดาห์ที่']) || 34,
-  day_number: parseInt(row['วันที่']) || 2,
-  activity_type: row['กิจกรรม'] || 'กิจกรรมเสริมประสบการณ์',
-  criteria_label: row['หัวข้อประเมิน'] || row['เกณฑ์การวัด'] || 'ไม่มีชื่อหัวข้อ', 
-  academic_year: '2569'
-}))
+        // 🎯 เช็กให้ชัวร์ว่าหัวตารางใน Excel ตรงกับภาษาไทยในนี้ครับ
+        const templatesToInsert = data.map((row: any) => ({
+          unit_name: row['หน่วย'] || 'วิทยาศาสตร์สร้างสรรค์',
+          week_number: 34,
+          day_number: 2,
+          activity_type: 'กิจกรรมเสริมประสบการณ์',
+          criteria_label: row['หัวข้อประเมิน'] || row['เกณฑ์การวัด'] || 'ไม่มีหัวข้อ',
+          academic_year: '2569'
+        }))
 
-      const { error } = await supabase
-        .from('assessment_templates')
-        .insert(templatesToInsert)
+        const { error } = await supabase
+          .from('assessment_templates')
+          .insert(templatesToInsert)
 
-      if (error) {
-        console.error('Error inserting templates:', error)
-        alert('เกิดข้อผิดพลาดในการนำเข้าข้อมูล ฮ้าาา')
-      } else {
-        alert('นำเข้าหัวข้อประเมินสำเร็จแล้วครับเพื่อน JP!')
-        if (onComplete) onComplete()
+        if (error) {
+           alert('Supabase ฟ้องว่า: ' + error.message) // ถ้าสิทธิ์ RLS ไม่ผ่าน มันจะฟ้องตรงนี้ครับ
+           throw error
+        }
+
+        alert('สำเร็จ! หัวข้อประเมินเข้าสู่ระบบแล้วครับเพื่อน JP')
+        if (onComplete) onComplete() // สั่งให้หน้าหลักรีเฟรชข้อมูล
+
+      } catch (err: any) {
+        console.error(err)
+        alert('เกิดข้อผิดพลาด: ' + (err.message || 'ไม่ทราบสาเหตุ ฮ้าาา'))
+      } finally {
+        setUploading(false) // ปลดล็อกสถานะ "กำลังทำงาน"
       }
-      setUploading(false)
     }
     reader.readAsBinaryString(file)
   }
@@ -53,12 +58,12 @@ const templatesToInsert = data.map((row: any) => ({
       <p className="text-purple-700 font-bold mb-2">📥 นำเข้าหัวข้อประเมินจาก Excel</p>
       <input 
         type="file" 
-        accept=".xlsx, .xls, .csv" 
+        accept=".xlsx, .xls" 
         onChange={handleFileUpload}
         disabled={uploading}
-        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700"
+        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 disabled:opacity-50"
       />
-      {uploading && <p className="mt-2 text-purple-500 animate-pulse">กำลังทำงาน... ฮ้าาาา</p>}
+      {uploading && <p className="mt-2 text-purple-500 animate-pulse font-bold">ระบบกำลังส่งข้อมูลเข้าโกดัง... ฮ้าาาา</p>}
     </div>
   )
 }
