@@ -34,7 +34,7 @@ export default function DirectorUnifiedDashboard() {
       "01": "ศูนย์ 1 ท่าเสด็จ", 
       "11": "ศูนย์ 1 ท่าเสด็จ(เพิ่มเติม)", 
       "02": "ศูนย์ 2 บ้านน้ำโมง", 
-      "12": "ศูนย์ 2 บ้านน้ำโมง" 
+      
     };
     return names[id] || `ศูนย์รหัส ${id}`;
   };
@@ -202,7 +202,7 @@ export default function DirectorUnifiedDashboard() {
             <table className="w-full text-left min-w-[600px]">
               <thead>
                 <tr className="bg-[#F8FAFC] text-[10px] md:text-[14px] font-black text-slate-500 uppercase tracking-widest">
-                  <th className="p-6 md:p-10">ศูนย์พัฒนาเด็กเล็ก</th>
+                  <th className="p-6 md:p-10">ศูนย์พัฒนาเด็กเล็กเทศบาลเมืองท่าบ่อ</th>
                   <th className="p-6 md:p-10">ระดับห้อง</th>
                   <th className="p-6 md:p-10 text-center">ชาย</th>
                   <th className="p-6 md:p-10 text-center">หญิง</th>

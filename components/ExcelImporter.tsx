@@ -3,7 +3,13 @@ import React, { useState } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
 
-export default function ExcelImporter({ onComplete }: any) {
+interface ExcelImporterProps {
+  selectedWeek: number;
+  selectedDay: number;
+  onComplete: () => void;
+}
+
+export default function ExcelImporter({ selectedWeek, selectedDay, onComplete }: ExcelImporterProps) {
   const [uploading, setUploading] = useState(false)
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -21,12 +27,12 @@ export default function ExcelImporter({ onComplete }: any) {
         const ws = wb.Sheets[wsname]
         const data = XLSX.utils.sheet_to_json(ws)
 
-        // 🎯 เช็กให้ชัวร์ว่าหัวตารางใน Excel ตรงกับภาษาไทยในนี้ครับ
+        // ✨ นำเข้าล็อกสัปดาห์และวันที่ ที่ตรงกับหน้าเว็บปัจจุบันของคุณครู
         const templatesToInsert = data.map((row: any) => ({
           unit_name: row['หน่วย'] || 'วิทยาศาสตร์สร้างสรรค์',
-          week_number: 34,
-          day_number: 2,
-          activity_type: 'กิจกรรมเสริมประสบการณ์',
+          week_number: selectedWeek, 
+          day_number: selectedDay,   
+          activity_type: row['กิจกรรม'] || 'กิจกรรมเสริมประสบการณ์',
           criteria_label: row['หัวข้อประเมิน'] || row['เกณฑ์การวัด'] || 'ไม่มีหัวข้อ',
           academic_year: '2569'
         }))
@@ -36,18 +42,18 @@ export default function ExcelImporter({ onComplete }: any) {
           .insert(templatesToInsert)
 
         if (error) {
-           alert('Supabase ฟ้องว่า: ' + error.message) // ถ้าสิทธิ์ RLS ไม่ผ่าน มันจะฟ้องตรงนี้ครับ
+           alert('Supabase ฟ้องว่า: ' + error.message)
            throw error
         }
 
-        alert('สำเร็จ! หัวข้อประเมินเข้าสู่ระบบแล้วครับเพื่อน JP')
-        if (onComplete) onComplete() // สั่งให้หน้าหลักรีเฟรชข้อมูล
+        alert(`สำเร็จ! นำเข้าหัวข้อสำหรับ สัปดาห์ที่ ${selectedWeek} วันที่ ${selectedDay} เรียบร้อยแล้วครับเพื่อน JP`)
+        if (onComplete) onComplete() 
 
       } catch (err: any) {
         console.error(err)
         alert('เกิดข้อผิดพลาด: ' + (err.message || 'ไม่ทราบสาเหตุ ฮ้าาา'))
       } finally {
-        setUploading(false) // ปลดล็อกสถานะ "กำลังทำงาน"
+        setUploading(false) 
       }
     }
     reader.readAsBinaryString(file)
@@ -56,6 +62,9 @@ export default function ExcelImporter({ onComplete }: any) {
   return (
     <div className="mb-6 p-4 border-2 border-dashed border-purple-300 rounded-xl bg-purple-50 text-center">
       <p className="text-purple-700 font-bold mb-2">📥 นำเข้าหัวข้อประเมินจาก Excel</p>
+      <p className="text-xs text-purple-600 mb-3 bg-purple-100 py-1.5 px-3 rounded-lg max-w-md mx-auto font-semibold">
+        📢 ระบบล็อกตำแหน่งไว้ที่: <b>สัปดาห์ที่ {selectedWeek} วันที่ {selectedDay}</b> (ตามที่เลือกอยู่ด้านล่าง)
+      </p>
       <input 
         type="file" 
         accept=".xlsx, .xls" 
