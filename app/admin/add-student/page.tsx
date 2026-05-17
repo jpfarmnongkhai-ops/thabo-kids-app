@@ -38,11 +38,12 @@ export default function AddStudentPage() {
     { label: "อนุบาล 1/2", value: "22" },
   ];
 
+  // 🎯 แก้ไขค่าเริ่มต้น (Default) ตรงนี้ให้ตรงกับกลุ่มที่มีครูอยู่จริงในฐานข้อมูลของเพื่อน JP
   const [formData, setFormData] = useState({
     year: "69",
-    center: "01",
-    room: "11",
-    gender: "01", // 01=ชาย, 02=หญิง
+    center: "11",     // เปลี่ยนเป็น "11" (ศูนย์ 1 เพิ่มเติม) เพื่อให้เปิดมาเจอครูเลย
+    room: "12",       // เปลี่ยนเป็น "12" (เด็กเล็ก 1/2) 
+    gender: "01",     // 01=ชาย, 02=หญิง
     sequence: "01",
     firstName: "",
     lastName: "",
@@ -52,34 +53,46 @@ export default function AddStudentPage() {
     phone_number: "",
   });
 
+  // 🔍 ฟังก์ชันดึงข้อมูลครู (ทำงานเฉพาะเวลา ศูนย์ หรือ ห้อง เปลี่ยนเท่านั้น)
   useEffect(() => {
-  const fetchTeachersByFilter = async () => {
-    // ถ้ายังไม่เลือกห้อง ไม่ต้องดึงข้อมูล
-    if (formData.room === "00") {
-      setDbTeachers([]);
-      return;
-    }
+    const fetchTeachersByFilter = async () => {
+      if (formData.room === "00") {
+        setDbTeachers([]);
+        return;
+      }
 
-    const { data } = await supabase
-      .from("teachers")
-      .select("*")
-      .eq("center_id", formData.center) // แยกศูนย์
-      .eq("room_number", formData.room) // แยกห้อง
-      .order("first_name", { ascending: true });
+      console.log(`📡 ดึงข้อมูลครูของ ศูนย์: ${formData.center} | ห้อง: ${formData.room}`);
 
-    if (data) setDbTeachers(data);
-  };
+      const { data, error } = await supabase
+        .from("teachers")
+        .select("*")
+        .eq("center_id", formData.center) 
+        .eq("room_number", formData.room) 
+        .order("first_name", { ascending: true });
 
-  fetchTeachersByFilter();
-  
-  // ล้างค่าครูที่เลือกไว้ก่อนหน้า เมื่อมีการเปลี่ยนศูนย์หรือห้อง
-  setFormData(prev => ({ ...prev, teacherName: "" }));
-  setSelectedTeacherData(null);
-}, [formData.center, formData.room]); // ทำงานใหม่เมื่อ 'ศูนย์' หรือ 'ห้อง' เปลี่ยน
+      if (error) {
+        console.error("Error fetching teachers:", error);
+        return;
+      }
 
+      if (data && data.length > 0) {
+        setDbTeachers(data);
+      } else {
+        setDbTeachers([]);
+      }
+    };
+
+    fetchTeachersByFilter();
+    
+    // ล้างค่าครูเก่าออก "เฉพาะ" ตอนเปลี่ยนศูนย์หรือห้องเท่านั้น ไม่เกี่ยวกับตอนเปลี่ยนเพศแล้ว!
+    setFormData(prev => ({ ...prev, teacherName: "" }));
+    setSelectedTeacherData(null);
+  }, [formData.center, formData.room]); 
+
+  // 🆔 คำนวณรหัสนักเรียน 10 หลักอัตโนมัติเมื่อ formData เปลี่ยนค่า
   useEffect(() => {
     setId10(`${formData.year}${formData.center}${formData.room}${formData.gender}${formData.sequence}`);
-  }, [formData]);
+  }, [formData.year, formData.center, formData.room, formData.gender, formData.sequence]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +111,7 @@ export default function AddStudentPage() {
           last_name: formData.lastName,
           nickname: formData.nickname,
           center_id: formData.center,
-          room_number: formData.room,
+          room: formData.room, // บันทึกค่าห้องเรียนรหัสคู่เชื่อมกับระบบ Dashboard
           gender_code: formData.gender,
           teacher_name: formData.teacherName,
           teacher_phone: selectedTeacherData?.phone_number || "",
@@ -127,14 +140,14 @@ export default function AddStudentPage() {
 
       alert(`💖 ลงทะเบียน "น้อง${formData.nickname}" เรียบร้อยแล้วค่ะ!`);
       
-      setFormData({ 
-        ...formData, 
+      setFormData(prev => ({ 
+        ...prev, 
         firstName: "", 
         lastName: "", 
         nickname: "", 
         phone_number: "", 
-        sequence: String(Number(formData.sequence) + 1).padStart(2, "0") 
-      });
+        sequence: String(Number(prev.sequence) + 1).padStart(2, "0") 
+      }));
     } catch (error: any) {
       alert("Error: " + error.message);
     } finally {
@@ -181,7 +194,7 @@ export default function AddStudentPage() {
               <select className="bg-pink-50/40 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-pink-300 font-medium text-slate-600 appearance-none" 
                 value={formData.center} onChange={e => setFormData({...formData, center: e.target.value})}>
                 <option value="01">ศูนย์ 1 ท่าเสด็จ</option>
-                <option value="11">ศูนย์ 1 (เพิ่มเติม)</option>
+                <option value="11">ศูนย์ 1 ท่าเสด็จ(เพิ่มเติม)</option>
                 <option value="02">ศูนย์ 2 บ้านน้ำโมง</option>
               </select>
               <select className="bg-pink-50/40 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-pink-300 font-medium text-slate-600 appearance-none" 
@@ -191,6 +204,7 @@ export default function AddStudentPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
+              {/* ช่องเลือกครูประจำชั้น */}
               <select className="bg-pink-50/40 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-pink-300 font-medium text-slate-600 appearance-none"
                 value={formData.teacherName} 
                 onChange={e => {
@@ -199,18 +213,18 @@ export default function AddStudentPage() {
                   setFormData({...formData, teacherName: e.target.value});
                 }} required>
                 <option value="">{dbTeachers.length > 0 ? "เลือกครูประจำชั้น" : "--- ไม่พบรายชื่อครู ---"}</option>
-  {dbTeachers.map((t, i) => (
-    <option key={i} value={`${t.first_name} ${t.last_name}`}>
-      ครู{t.nickname} ({t.first_name})
-    </option>
-  ))}
-</select>
+                {dbTeachers.map((t, i) => (
+                  <option key={i} value={`${t.first_name} ${t.last_name}`}>
+                    ครู{t.nickname} ({t.first_name})
+                  </option>
+                ))}
+              </select>
               
-              {/* ✅ ช่องเลือกเพศที่เพิ่มเข้ามาใหม่ */}
+              {/* ช่องเลือกเพศ (กู้คืนกลับมาเคียงคู่กันอย่างปลอดภัยแล้ว!) */}
               <select className="bg-pink-50/40 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-pink-300 font-medium text-slate-600 appearance-none"
                 value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})}>
-                <option value="01">เพศชาย </option>
-                <option value="02">เพศหญิง </option>
+                <option value="01">เพศชาย</option>
+                <option value="02">เพศหญิง</option>
               </select>
             </div>
 
@@ -225,7 +239,7 @@ export default function AddStudentPage() {
 
           <button type="submit" disabled={isSubmitting}
             className={`w-full py-5 rounded-[2rem] font-black text-xl text-white shadow-xl transition-all active:scale-95 ${
-              isSubmitting ? 'bg-slate-300' : 'bg-gradient-to-r from-[#FF6B95] to-[#FDABDD] hover:shadow-pink-200'
+              isSubmitting ? 'bg-slate-300' : 'bg-gradient-to-r from-[#FF6B95] to-[#FDABDD]'
             }`}>
             {isSubmitting ? "กำลังบันทึก..." : "ยืนยันการลงทะเบียน"}
           </button>

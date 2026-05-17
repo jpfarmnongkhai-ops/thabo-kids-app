@@ -60,33 +60,40 @@ export default function JPUltimateWarRoom() {
   };
 
   // แก้ไข: ระบบเพิ่มสมาชิกแบบแยก Role และรองรับเบอร์โทร
+  // ✨ โค้ดฉบับ Modify ตามสั่ง: สำหรับเพิ่มสิทธิ์บัญชาการแอดมิน/ครู ลงตาราง profiles เท่านั้น
   const handleAddMember = async (name: string, phone: string, role: string) => {
     try {
-      // เลือกตารางตามประเภท (ถ้าเด็กนักเรียนเข้า จะส่งไปตาราง students)
-      const targetTable = role === 'student' ? 'students' : 'profiles';
+      const cleanPhone = phone.trim().replace(/-/g, "");
 
+      // ยิงตรงเข้าตาราง profiles อย่างเดียว ปลอดภัยจากบั๊ก full_name แน่นอน
       const { error } = await supabase
-        .from(targetTable)
-        .insert([{ 
-          display_name: name, 
-          full_name: name, 
-          phone_number: phone, // เก็บเป็นเบอร์โทรตามที่คุยกัน
-          role: role,
-          status: 'online' 
+        .from("profiles")
+        .insert([{
+          id: crypto.randomUUID(), // สยบบั๊ก Not-Null Constraint 
+          phone_number: cleanPhone,
+          password: "123456",      // รหัสดีฟอลต์เริ่มต้น
+          role: role,              // ควบคุมสิทธิ์ผ่านการเลือก role ตรงๆ ตามที่เพื่อนต้องการ
+          display_name: name,
+          first_name: name,
+          last_name: "บัญชาการ",    // นามสกุลระบบชั่วคราว
+          center_id: "11",         // สังกัดศูนย์ควบคุมหลัก
+          is_first_login: false
         }]);
 
-      if (!error) {
-        setIsModalOpen(false);
-        fetchMembers(); // รีโหลดรายการทันที
-        setChatHistory(prev => [...prev, { 
-          role: 'ai', 
-          text: `SYSTEM: เพิ่ม ${name} (${role}) เข้าสู่ ${targetTable} สำเร็จแล้วครับเพื่อน JP!` 
-        }]);
-      } else {
-        throw error;
-      }
+      if (error) throw error;
+
+      // 🎉 อัปเดต UI ทันทีหลังการ Inject สำเร็จ
+      setIsModalOpen(false);
+      fetchMembers(); // รีโหลดลิสต์ขวามือให้รายชื่อใหม่เด้งขึ้นมา
+      
+      setChatHistory(prev => [...prev, { 
+        role: 'ai', 
+        text: `SYSTEM: อนุมัติการเข้าถึงระบบของ "${name}" ในฐานะ [${role.toUpperCase()}] เรียบร้อยแล้วครับเพื่อน JP!` 
+      }]);
+
     } catch (err: any) {
-      alert("Error: " + err.message);
+      console.error("War Room Inject Error:", err);
+      alert("❌ เกิดข้อผิดพลาดในระบบวอร์รูม: " + err.message);
     }
   };
 
