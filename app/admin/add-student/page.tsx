@@ -111,7 +111,7 @@ export default function AddStudentPage() {
           last_name: formData.lastName,
           nickname: formData.nickname,
           center_id: formData.center,
-          room: formData.room, // บันทึกค่าห้องเรียนรหัสคู่เชื่อมกับระบบ Dashboard
+          room_number: formData.room, // บันทึกค่าห้องเรียนรหัสคู่เชื่อมกับระบบ Dashboard
           gender_code: formData.gender,
           teacher_name: formData.teacherName,
           teacher_phone: selectedTeacherData?.phone_number || "",
