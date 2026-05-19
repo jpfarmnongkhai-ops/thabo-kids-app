@@ -1,9 +1,9 @@
 "use client";
-import { useState, useEffect, Suspense } from "react"; // เพิ่ม Suspense เข้ามา
+import { useState, useEffect, Suspense } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
+import AttendanceTable from "@/components/AttendanceTable"; // 🎯 Import ตารางตัวใหม่เข้ามา!
 
-// --- ส่วนเนื้อหาหลัก (คงเดิม 100%) ---
 function AttendanceContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -15,16 +15,16 @@ function AttendanceContent() {
   const [loading, setLoading] = useState(false);
 
   const centers = [
-    { id: "01", name: "ศูนย์ 1 ท่าเสด็จ", color: "bg-[#B2D7F5]" },
-    { id: "11", name: "ศูนย์ 1 ท่าเสด็จ (เพิ่มเติม)", color: "bg-[#F5B7D9]" },
-    { id: "02", name: "ศูนย์ 2 น้ำโมง", color: "bg-[#B7E5B4]" }
+    { id: "01", name: "ศูนย์ 1 ท่าเสด็จ" },
+    { id: "11", name: "ศูนย์ 1 ท่าเสด็จ (เพิ่มเติม)" },
+    { id: "02", name: "ศูนย์ 2 น้ำโมง" }
   ];
 
   const roomOptions = [
-    { label: "เด็กเล็ก 1/1", value: "11", bg: "bg-[#B2D7F5]", text: "text-blue-600" },
-    { label: "เด็กเล็ก 1/2", value: "12", bg: "bg-[#B7E5B4]", text: "text-green-600" },
-    { label: "อนุบาล 1/1", value: "21", bg: "bg-[#FFF4B5]", text: "text-yellow-700" },
-    { label: "อนุบาล 1/2", value: "22", bg: "bg-[#FBC4AB]", text: "text-orange-600" },
+    { label: "เด็กเล็ก 1/1", value: "11", bg: "bg-[#B2D7F5]" },
+    { label: "เด็กเล็ก 1/2", value: "12", bg: "bg-[#B7E5B4]" },
+    { label: "อนุบาล 1/1", value: "21", bg: "bg-[#FFF4B5]" },
+    { label: "อนุบาล 1/2", value: "22", bg: "bg-[#FBC4AB]" },
   ];
 
   useEffect(() => {
@@ -33,12 +33,11 @@ function AttendanceContent() {
       const today = new Date().toISOString().split('T')[0];
 
       const { data: studentData } = await supabase
-        .from("students")
-        .select("student_id_10, first_name, last_name, nickname, gender_code")
-        .eq("center_id", centerId)
-        .eq("room_number", room)
-        .order("first_name");
-      
+  .from("students")
+  .select("student_id_10, first_name, last_name, nickname, gender_code")
+  .eq("center_id", centerId)
+  .eq("room_number", room)
+  .order("student_id_10", { ascending: true }); // 🎯 เปลี่ยนมาเรียงลำดับตาม ID จากน้อยไปมาก
       if (studentData) setStudents(studentData);
 
       const { data: attData } = await supabase
@@ -69,7 +68,8 @@ function AttendanceContent() {
 
   return (
     <div className="min-h-screen bg-[#FDFCF0] p-6 pb-40 flex flex-col items-center font-sans">
-      <div className="w-full max-w-md">
+      {/* 📐 ขยายขนาดความกว้างขึ้นเป็น max-w-3xl ให้รับสัดส่วนตาราง */}
+      <div className="w-full max-w-3xl">
         <header className="mb-8">
           <div className="flex justify-between items-center mb-6">
             <button 
@@ -78,7 +78,7 @@ function AttendanceContent() {
             >
               <span className="text-xl">←</span>
             </button>
-            <h1 className="text-2xl font-black text-[#A084D6] tracking-tight">เช็คชื่อน้องๆ 📋</h1>
+            <h1 className="text-2xl font-black text-[#A084D6] tracking-tight">ระบบเช็คชื่อน้อง ๆ 📋</h1>
             <div className="w-12 h-12 bg-[#D9F3FF] rounded-2xl flex items-center justify-center text-xl shadow-inner">✨</div>
           </div>
           
@@ -94,7 +94,8 @@ function AttendanceContent() {
           </div>
         </header>
 
-        <div className="grid grid-cols-2 gap-3 mb-8">
+        {/* แถบเลือกห้องเรียน */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
           {roomOptions.map((r) => (
             <button
               key={r.value}
@@ -110,11 +111,12 @@ function AttendanceContent() {
           ))}
         </div>
 
-        <div className="space-y-4">
+        {/* 📦 พื้นที่แสดงผลข้อมูลตารางเช็คชื่อ */}
+        <div>
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 animate-pulse">
               <div className="w-12 h-12 bg-[#E6E6FA] rounded-full mb-4"></div>
-              <p className="text-[#B19CD9] font-black text-sm italic">กำลังเรียกน้องๆ เข้าแถว...</p>
+              <p className="text-[#B19CD9] font-black text-sm italic">กำลังเรียกน้องๆ เข้าแถวในตาราง...</p>
             </div>
           ) : students.length === 0 ? (
             <div className="text-center py-20 bg-white/60 rounded-[3rem] border-4 border-dashed border-white text-slate-400 font-bold px-10">
@@ -122,46 +124,17 @@ function AttendanceContent() {
               <p>ไม่พบรายชื่อในห้องนี้นะครับ</p>
             </div>
           ) : (
-            students.map((std) => (
-              <div key={std.student_id_10} className="bg-white p-5 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border-4 border-white transition-all">
-                <div className="flex justify-between items-center mb-5 px-2">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl ${std.gender_code === '01' ? 'bg-[#D9F3FF]' : 'bg-[#FFE4F2]'}`}>
-                      {std.gender_code === '01' ? '👦' : '👧'}
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="font-black text-slate-800 text-lg leading-tight">น้อง{std.nickname || std.first_name}</span>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{std.first_name} {std.last_name}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-4 gap-2">
-                  {[
-                    { key: 'present', label: 'มา', active: 'bg-[#B7E5B4] text-green-800' },
-                    { key: 'late', label: 'สาย', active: 'bg-[#FFF4B5] text-yellow-800' },
-                    { key: 'leave', label: 'ลา', active: 'bg-[#B2D7F5] text-blue-800' },
-                    { key: 'absent', label: 'ขาด', active: 'bg-[#F5B7D9] text-pink-800' },
-                  ].map((s) => (
-                    <button
-                      key={s.key}
-                      onClick={() => handleCheck(std.student_id_10, s.key)}
-                      className={`py-4 rounded-2xl text-[13px] font-black transition-all active:scale-90 border-2 ${
-                        attendance[std.student_id_10] === s.key 
-                        ? `${s.active} border-white shadow-md` 
-                        : "bg-slate-50 border-transparent text-slate-400"
-                      }`}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))
+            /* 🔥 ส่งข้อมูลข้ามไปให้ตารางตัวเก่งของเราวาดผลลัพธ์ */
+            <AttendanceTable 
+              students={students} 
+              attendance={attendance} 
+              onCheck={handleCheck} 
+            />
           )}
         </div>
 
-        <div className="fixed bottom-8 left-6 right-6 flex justify-center">
+        {/* ปุ่มเซฟด้านล่าง */}
+        <div className="fixed bottom-8 left-6 right-6 flex justify-center z-50">
           <button 
             onClick={() => router.push('/admin/dashboard')} 
             className="w-full max-w-sm bg-[#FF85B3] text-white py-5 rounded-[2.5rem] font-black shadow-2xl shadow-pink-200 active:scale-95 transition-all flex items-center justify-center gap-3 border-4 border-white"
@@ -175,7 +148,6 @@ function AttendanceContent() {
   );
 }
 
-// --- ส่วนแสดงผลหลักที่แก้ปัญหาเรื่อง Build ---
 export default function AttendancePage() {
   return (
     <Suspense fallback={<div className="p-10 text-center font-bold">กำลังโหลด...</div>}>
