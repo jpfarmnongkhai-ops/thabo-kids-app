@@ -35,7 +35,7 @@ export default function HomePage() {
     { title: "ลงทะเบียนเด็กใหม่", icon: "➕", link: "/admin/add-student", color: "bg-[#F3C1E4]", textColor: "text-[#8E4D7E]", roles: ['super_admin', 'admin', 'teacher'] },
     { title: "รายชื่อนักเรียน", icon: "👶", link: "/admin/students", color: "bg-[#FFB7B2]", textColor: "text-[#8E443D]", roles: ['super_admin', 'admin', 'teacher'] },
     { title: "ทำเนียบครู", icon: "👩‍🏫", link: "/admin/teachers", color: "bg-[#FFF4B5]", textColor: "text-[#8B7E2E]", roles: ['super_admin', 'admin'] },
-    { title: "Dashboard สถิติ", icon: "📊", link: "/admin/dashboard", color: "bg-[#B4E3B4]", textColor: "text-[#3D6E3D]", roles: ['super_admin', 'admin', 'teacher'] },
+    { title: "Dashboard สถิติ", icon: "📊", link: "/admin/director", color: "bg-[#B4E3B4]", textColor: "text-[#3D6E3D]", roles: ['super_admin', 'admin', 'teacher'] },
     { title: "Admin Panel ", icon: "⚡", link: "/admin", color: "bg-[#336666]", textColor: "text-cyan-400", roles: ['super_admin', 'admin'] },
  { title: "Education Office", icon: "⚡", link: "/admin/education-office", color: "bg-[#003366]", textColor: "text-cyan-400", roles: ['super_admin', 'admin'] },
   ];

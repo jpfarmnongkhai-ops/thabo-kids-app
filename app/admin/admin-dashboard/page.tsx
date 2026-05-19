@@ -3,10 +3,10 @@ import HUDPerformance from "@/components/HUDPerformance";
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell 
 } from "recharts";
 import Link from "next/link";
-import { Clock3, LayoutDashboard, ShieldCheck, Activity, Users, Radio } from "lucide-react";
+import { Clock3, LayoutDashboard, Activity, Users, Radio } from "lucide-react";
 
 // --- HELPERS ---
 const getCenterFullName = (id: string) => {
@@ -30,7 +30,7 @@ export default function AdminSciFiDashboard() {
   const [mounted, setMounted] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [students, setStudents] = useState<any[]>([]);
-  const [staff, setStaff] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<any[]>([]); // 🎯 เปลี่ยนจาก staff เป็น teachers ให้ตรงฐานข้อมูล
 
   useEffect(() => {
     setMounted(true);
@@ -40,33 +40,44 @@ export default function AdminSciFiDashboard() {
   }, []);
 
   const fetchData = async () => {
-    const [stdRes, staffRes] = await Promise.all([
-      supabase.from("students").select("*"),
-      supabase.from("staff").select("*") 
-    ]);
-    if (stdRes.data) setStudents(stdRes.data);
-    if (staffRes.data) setStaff(staffRes.data);
+    try {
+      // 🎯 เปลี่ยนการ fetch จาก "staff" เป็น "teachers"
+      const [stdRes, teacherRes] = await Promise.all([
+        supabase.from("students").select("*"),
+        supabase.from("teachers").select("*") 
+      ]);
+      
+      if (stdRes.data) setStudents(stdRes.data);
+      if (teacherRes.data) setTeachers(teacherRes.data);
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    }
   };
 
   const getStatsByCenter = (centerId: string) => {
-    const filtered = students.filter(s => s.center_id === centerId);
+    const filtered = students.filter(s => String(s.center_id) === String(centerId));
     const boys = filtered.filter(s => s.gender_code === "01").length;
     const girls = filtered.filter(s => s.gender_code === "02").length;
-    return { total: filtered.length, boys, girls, data: filtered };
+    
+    // 🎯 คำนวณจำนวนครูประจำศูนย์จากตาราง teachers
+    const totalStaff = teachers.filter(t => {
+      if (!t.center_id) return false;
+      return String(t.center_id) === String(centerId) || Number(t.center_id) === Number(centerId);
+    }).length;
+    
+    return { total: filtered.length, boys, girls, totalStaff, data: filtered };
   };
 
   if (!mounted) return <div className="min-h-screen bg-[#020617]" />;
 
   return (
-    // จากเดิม bg-[#020617] (ดำสนิท)
-// เปลี่ยนเป็น bg-[#0f172a] หรือ bg-slate-900 (น้ำเงินเข้ม/เทา) 
-<div className="min-h-screen bg-slate-900 text-cyan-300 font-mono p-4 md:p-6 relative overflow-hidden">
-  
-  {/* ปรับ Grid ให้สว่างขึ้นนิดนึง */}
-  <div className="absolute inset-0 bg-[linear-gradient(rgba(6,182,212,0.15)_1px,transparent_1px),linear-gradient(90deg,rgba(6,182,212,0.15)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
-  
-  {/* เพิ่มแสงฟุ้ง (Glow) ให้สว่างขึ้น */}
-  <div className="absolute top-[-5%] left-[-5%] w-[50%] h-[50%] bg-cyan-400/20 blur-[100px] rounded-full"></div>
+    <div className="min-h-screen bg-slate-900 text-cyan-300 font-mono p-4 md:p-6 relative overflow-hidden">
+      
+      {/* Grid Background */}
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(6,182,212,0.15)_1px,transparent_1px),linear-gradient(90deg,rgba(6,182,212,0.15)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+      
+      {/* Glow Effects */}
+      <div className="absolute top-[-5%] left-[-5%] w-[50%] h-[50%] bg-cyan-400/20 blur-[100px] rounded-full"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full"></div>
 
       {/* 🛰️ TOP HUD BAR */}
@@ -107,7 +118,8 @@ export default function AdminSciFiDashboard() {
           <MetricBox label="รวมทั้งสิ้น" value={students.length} icon={<Users size={14}/>} color="cyan" />
           <MetricBox label="ชายจำนวน" value={students.filter(s => s.gender_code === "01").length} color="blue" />
           <MetricBox label="หญิงจำนวน" value={students.filter(s => s.gender_code === "02").length} color="pink" />
-          <MetricBox label="คุณครูจำนวน" value={staff.length} icon={<Activity size={14}/>} color="emerald" />
+          {/* 🎯 แสดงจำนวนครูรวมจากตาราง teachers */}
+          <MetricBox label="คุณครูจำนวน" value={teachers ? teachers.length : 0} icon={<Activity size={14}/>} color="emerald" />
         </div>
 
         {/* 🚀 PERFORMANCE ANALYTICS */}
@@ -119,11 +131,15 @@ export default function AdminSciFiDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {["01", "11", "02"].map((centerId) => {
             const stats = getStatsByCenter(centerId);
-            const centerStaff = staff.filter(t => t.center_id === centerId);
+            
+            // 🎯 คัดกรองครูประจำศูนย์ย่อย
+            const centerTeachers = teachers.filter(t => {
+              if (!t.center_id) return false;
+              return String(t.center_id) === String(centerId) || Number(t.center_id) === Number(centerId);
+            });
 
             return (
               <div key={centerId} className="group relative bg-slate-950/60 border border-cyan-950 p-5 backdrop-blur-sm hover:border-cyan-500/50 transition-all overflow-hidden ring-1 ring-white/5">
-                {/* HUD Decorations */}
                 <div className="absolute top-0 right-0 w-12 h-12 border-t-2 border-r-2 border-cyan-500/20 group-hover:border-cyan-500 transition-colors"></div>
                 <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-cyan-500/10 group-hover:border-cyan-500 transition-colors"></div>
                 
@@ -135,39 +151,47 @@ export default function AdminSciFiDashboard() {
                   <span className="text-[12px] bg-cyan-500/10 px-2 py-0.5 border border-cyan-500/30 text-cyan-500 font-bold italic">ID_{centerId}</span>
                 </div>
 
-                {/* Staff Area */}
-                <div className="mb-6 p-3 bg-black/40 border-l-2 border-cyan-500/50 space-y-2">
-                  <p className="text-[12px] text-cyan-600 font-bold tracking-[0.3em] uppercase">บุคลากร</p>
-                  {centerStaff.slice(0, 2).map((s, i) => (
-                    <div key={i} className="flex justify-between text-[12px]">
-                      <span className="text-slate-300">ครู {s.first_name}</span>
-                      <span className="text-cyan-600 font-bold">{s.position?.substring(0, 10)}</span>
-                    </div>
-                  ))}
+                {/* 🎯 Staff Area (รายชื่อครูประจำศูนย์) */}
+                <div className="mb-6 p-3 bg-black/40 border-l-2 border-emerald-500/50 space-y-2">
+                  <div className="flex justify-between items-center border-b border-cyan-950 pb-1">
+                    <p className="text-[11px] text-emerald-400 font-black tracking-[0.2em] uppercase">STAFF_UNITS</p>
+                    <span className="text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                      รวม {stats.totalStaff} ท่าน
+                    </span>
+                  </div>
+                  
+                  {centerTeachers.length > 0 ? (
+                    centerTeachers.slice(0, 3).map((s, i) => (
+                      <div key={i} className="flex justify-between text-[12px]">
+                        <span className="text-slate-300">ครู {s.first_name} {s.last_name ? s.last_name.substring(0, 5) + '.' : ''}</span>
+                        <span className="text-cyan-600 font-bold truncate max-w-[120px]">{s.position || 'ผู้ดูแลเด็ก'}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-[11px] text-slate-500 italic text-center py-1">NO_STAFF_RECORDED</div>
+                  )}
                 </div>
 
                 {/* Graph Area */}
-<div className="h-32 w-full mb-4 opacity-80 group-hover:opacity-100 transition-opacity">
-  <ResponsiveContainer width="100%" height="100%">
-    {/* 🔥 เปลี่ยน n จาก 'M', 'F' เป็น 'ชาย', 'หญิง' ตรงนี้ครับ */}
-    <BarChart data={[
-      { n: 'ชาย', v: stats.boys, c: '#3b82f6' }, 
-      { n: 'หญิง', v: stats.girls, c: '#ec4899' }
-    ]}>
-      <CartesianGrid strokeDasharray="2 2" stroke="#06b6d410" vertical={false} />
-      <XAxis dataKey="n" tick={{fill: '#0891b2', fontSize: 10}} axisLine={false} tickLine={false} />
-      <Bar dataKey="v" radius={[2, 2, 0, 0]} barSize={30}>
-        {/* 🔥 และอย่าลืมเปลี่ยนตรง map เพื่อให้สีตรงกับแถบด้วยครับ */}
-        {[
-          { n: 'ชาย', v: stats.boys, c: '#3b82f6' }, 
-          { n: 'หญิง', v: stats.girls, c: '#ec4899' }
-        ].map((entry, index) => (
-          <Cell key={`cell-${index}`} fill={entry.c} fillOpacity={0.6} />
-        ))}
-      </Bar>
-    </BarChart>
-  </ResponsiveContainer>
-</div>
+                <div className="h-32 w-full mb-4 opacity-80 group-hover:opacity-100 transition-opacity">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={[
+                      { n: 'ชาย', v: stats.boys, c: '#3b82f6' }, 
+                      { n: 'หญิง', v: stats.girls, c: '#ec4899' }
+                    ]}>
+                      <CartesianGrid strokeDasharray="2 2" stroke="#06b6d410" vertical={false} />
+                      <XAxis dataKey="n" tick={{fill: '#0891b2', fontSize: 10}} axisLine={false} tickLine={false} />
+                      <Bar dataKey="v" radius={[2, 2, 0, 0]} barSize={30}>
+                        {[
+                          { n: 'ชาย', v: stats.boys, c: '#3b82f6' }, 
+                          { n: 'หญิง', v: stats.girls, c: '#ec4899' }
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.c} fillOpacity={0.6} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
 
                 {/* Rooms Breakdown */}
                 <div className="grid grid-cols-2 gap-2 mt-4">

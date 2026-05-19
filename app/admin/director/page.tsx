@@ -34,9 +34,18 @@ export default function DirectorUnifiedDashboard() {
       "01": "ศูนย์ 1 ท่าเสด็จ", 
       "11": "ศูนย์ 1 ท่าเสด็จ(เพิ่มเติม)", 
       "02": "ศูนย์ 2 บ้านน้ำโมง", 
-      
     };
     return names[id] || `ศูนย์รหัส ${id}`;
+  };
+
+  // 🏢 เพิ่มฟังก์ชันแปลงรหัสศูนย์เป็นชื่อย่อสั้นๆ สำหรับแสดงบนแกน X ของกราฟ
+  const getCenterShortName = (id: string) => {
+    const names: any = { 
+      "01": "ศ.1", 
+      "11": "ศ.1(พ)", 
+      "02": "ศ.2", 
+    };
+    return names[id] || `ศ.${id}`;
   };
 
   const getRoomFullName = (roomId: string) => {
@@ -52,25 +61,25 @@ export default function DirectorUnifiedDashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 1. ดึงข้อมูลนักเรียน
       const { data: students, error: studentError } = await supabase
         .from("students")
         .select("*");
 
       if (studentError) throw studentError;
 
-      // 2. ดึงข้อมูลครู
       const { data: teacherList } = await supabase.from("teachers").select("*");
       if (teacherList) setTeachers(teacherList);
 
       if (students) {
-        // --- ส่วนประมวลผลข้อมูลสำหรับกราฟและตาราง ---
         const grouped = students.reduce((acc: any, std: any) => {
           const key = `${std.center_id}-${std.room_number}`;
           if (!acc[key]) {
             acc[key] = {
+              centerId: std.center_id, // 🎯 เก็บไอดีไว้ใช้ต่อ
               centerName: getCenterFullName(std.center_id),
               roomName: getRoomFullName(std.room_number),
+              // 🎯 สร้าง Label ผสมสำหรับแกน X เช่น "[ศ.1] เด็กเล็ก 1/1"
+              graphLabel: `[${getCenterShortName(std.center_id)}] ${getRoomFullName(std.room_number)}`,
               ชาย: 0,
               หญิง: 0,
               รวม: 0
@@ -108,6 +117,34 @@ export default function DirectorUnifiedDashboard() {
     acc[curr.centerName] = (acc[curr.centerName] || 0) + curr.รวม;
     return acc;
   }, {});
+
+  // 🎯 สร้างฟังก์ชัน Custom Tooltip เพื่อแสดงรายละเอียดตอนเอาเมาส์ชี้แบบสวยงามและชัดเจน
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload; // ดึงข้อมูลเต็มของแถวนั้นมา
+      return (
+        <div className="bg-slate-950 text-white p-4 rounded-2xl shadow-2xl border border-slate-800 text-xs font-sans min-w-[200px]">
+          <p className="font-black text-[#FFDAC1] mb-0.5 text-[11px] uppercase tracking-wide">⚙️ {data.centerName}</p>
+          <p className="font-black text-white text-sm mb-2 pb-1.5 border-b border-white/10">ห้องเรียน: {data.roomName}</p>
+          <div className="space-y-1 font-bold text-slate-300">
+            <div className="flex justify-between gap-4">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#C7CEEA]"></span> นักเรียนชาย:</span>
+              <span className="font-black text-[#C7CEEA]">{data.ชาย} คน</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#FFB7B2]"></span> นักเรียนหญิง:</span>
+              <span className="font-black text-[#FFB7B2]">{data.หญิง} คน</span>
+            </div>
+            <div className="flex justify-between gap-4 pt-1.5 mt-1.5 border-t border-dashed border-white/20 text-white font-black">
+              <span>📊 ยอดรวมทั้งห้อง:</span>
+              <span className="text-xl text-[#B5EAD7]">{data.รวม} คน</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   if (!mounted) return <div className="min-h-screen bg-[#FDFCF0]" />;
 
@@ -158,18 +195,22 @@ export default function DirectorUnifiedDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
+          {/* 📊 ส่วนกราฟสถิติรายห้องเรียนแบบเพิ่มรายละเอียด */}
           <div className="bg-white p-6 md:p-10 rounded-[2.5rem] md:rounded-[4rem] shadow-2xl border-4 border-white relative">
             <div className="absolute top-0 left-0 w-full h-3 md:h-4 bg-[#B5EAD7]"></div>
-            <h3 className="text-lg md:text-xl font-black text-slate-800 mb-6 flex items-center gap-2">📊 สถิติรายห้องเรียน</h3>
+            <h3 className="text-lg md:text-xl font-black text-slate-800 mb-6 flex items-center gap-2">📊 สถิติแยกรายศูนย์และห้องเรียน</h3>
             <div className="h-[250px] md:h-[350px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={reportData}>
+                <BarChart data={reportData} margin={{ bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                  <XAxis dataKey="roomName" tick={{fontSize: 10, fontWeight: 'bold'}} />
+                  {/* 🎯 แกน X จะแสดงเป็น [ศ.1] เด็กเล็ก 1/1 ชัดเจนยิ่งขึ้น */}
+                  <XAxis dataKey="graphLabel" tick={{fontSize: 10, fontWeight: 'black', fill: '#4A5568'}} />
                   <YAxis tick={{fontSize: 10, fontWeight: 'bold'}} />
-                  <Tooltip contentStyle={{borderRadius: '15px', border: 'none'}} />
-                  <Bar name="ชาย" dataKey="ชาย" fill="#C7CEEA" radius={[5, 5, 0, 0]} />
-                  <Bar name="หญิง" dataKey="หญิง" fill="#FFB7B2" radius={[5, 5, 0, 0]} />
+                  {/* 🎯 เรียกใช้ Custom Tooltip ดีไซน์ไซไฟระบุชื่อศูนย์แบบเต็มยศ */}
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#F8FAFC' }} />
+                  <Legend verticalAlign="top" height={36} wrapperStyle={{ fontWeight: 'black', fontSize: 12 }}/>
+                  <Bar name="นักเรียนชาย" dataKey="ชาย" fill="#C7CEEA" radius={[5, 5, 0, 0]} />
+                  <Bar name="นักเรียนหญิง" dataKey="หญิง" fill="#FFB7B2" radius={[5, 5, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

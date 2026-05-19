@@ -40,14 +40,21 @@ export default function AdminControlCenter() {
       const { data: allStudents } = await supabase.from("students").select("*");
       if (allStudents) setStudents(allStudents);
 
+      // 🎯 แก้ไขฟังก์ชันดึงสถิติให้ใช้ gender_code ("01" = ชาย, "02" = หญิง)
       const getStats = async (centerId?: string) => {
         let baseQuery = supabase.from("students").select("*", { count: 'exact', head: true });
         if (centerId) baseQuery = baseQuery.eq("center_id", centerId);
 
         const [all, male, female] = await Promise.all([
           baseQuery,
-          supabase.from("students").select("*", { count: 'exact', head: true }).eq("gender", "ชาย").match(centerId ? {center_id: centerId} : {}),
-          supabase.from("students").select("*", { count: 'exact', head: true }).eq("gender", "หญิง").match(centerId ? {center_id: centerId} : {})
+          supabase.from("students")
+            .select("*", { count: 'exact', head: true })
+            .eq("gender_code", "01") // 🎯 เปลี่ยนจาก gender = 'ชาย' เป็น gender_code = '01'
+            .match(centerId ? { center_id: centerId } : {}),
+          supabase.from("students")
+            .select("*", { count: 'exact', head: true })
+            .eq("gender_code", "02") // 🎯 เปลี่ยนจาก gender = 'หญิง' เป็น gender_code = '02'
+            .match(centerId ? { center_id: centerId } : {})
         ]);
         return { all: all.count || 0, male: male.count || 0, female: female.count || 0 };
       };
@@ -98,6 +105,7 @@ export default function AdminControlCenter() {
           <StatBox label="ศูนย์ 1 ท่าเสด็จ" stats={stats.thaSadet} bgColor="bg-[#BBF7D0]" textColor="text-emerald-700" />
           <StatBox label="ศูนย์ 1 (เพิ่มเติม)" stats={stats.thaSadetExtra} bgColor="bg-[#DCFCE7]" textColor="text-emerald-600" />
           <StatBox label="ศูนย์ 2 บ้านน้ำโมง" stats={stats.namMong} bgColor="bg-[#FEF08A]" textColor="text-yellow-700" />
+          {/* บังคับส่งค่า isAttendance เพื่อจัดการการแสดงผลแถบล่างให้สวยงาม */}
           <StatBox label="มาเรียนวันนี้" value={stats.attendanceToday} isAttendance bgColor="bg-[#FECACA]" textColor="text-red-700" />
         </div>
 
@@ -123,13 +131,20 @@ function StatBox({ label, stats, value, bgColor, textColor, isAttendance }: any)
 
   return (
     <div className="flex flex-col gap-1 transition-transform hover:scale-105">
-      <div className={`${bgColor} p-6 rounded-t-[2rem] border-x-2 border-t-2 border-white/50 text-center shadow-sm`}>
+      <div className={`${bgColor} p-6 rounded-t-[2rem] border-x-2 border-t-2 border-white/50 text-center shadow-sm flex-1 flex flex-col justify-center`}>
         <p className={`text-[10px] font-black ${textColor} uppercase opacity-70 tracking-tighter mb-1`}>{label}</p>
         <p className={`text-3xl font-black ${textColor}`}>{displayValue.toLocaleString()}</p>
       </div>
-      <div className="bg-[#E9B7FF] rounded-b-[1rem] py-2 px-4 flex justify-between text-[10px] font-black text-white shadow-md border-b-2 border-purple-300">
-        <span>ชาย {male} คน</span>
-        <span>หญิง {female} คน</span>
+      {/* 🎯 ซ่อนหรือเปลี่ยนรูปแบบแถบสรุปด้านล่างกรณีเป็นกล่องแจ้งยอดเข้าเรียนวันนี้ */}
+      <div className={`${isAttendance ? 'bg-red-400/90' : 'bg-[#E9B7FF]'} rounded-b-[1rem] py-2 px-4 flex justify-between text-[10px] font-black text-white shadow-md border-b-2 ${isAttendance ? 'border-red-400' : 'border-purple-300'}`}>
+        {isAttendance ? (
+          <span className="w-full text-center uppercase tracking-wider">DAILY_ATTENDANCE_LOG</span>
+        ) : (
+          <>
+            <span>ชาย {male} คน</span>
+            <span>หญิง {female} คน</span>
+          </>
+        )}
       </div>
     </div>
   );
