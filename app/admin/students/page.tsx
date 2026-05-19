@@ -8,8 +8,12 @@ import Link from "next/link";
 export default function StudentsPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // 🎯 State สำหรับระบบค้นหาสุดวิเศษ
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCenter, setSelectedCenter] = useState<string>("all"); // "all", "01", "11", "02"
 
-  // ข้อมูลชื่อศูนย์และห้องเรียนตามที่เพื่อน JP กำหนด
+  // ข้อมูลชื่อศูนย์และห้องเรียนตามที่เพื่อนกำหนด
   const centerNames: any = { 
     "01": "ศูนย์ 1 ท่าเสด็จ", 
     "11": "ศูนย์ 1 ท่าเสด็จ(เพิ่มเติม)", 
@@ -37,8 +41,30 @@ export default function StudentsPage() {
     fetchStudents();
   }, []);
 
-  // ฟังก์ชันจัดกลุ่มนักเรียน (Group by Center -> Group by Room)
-  const groupedStudents = students.reduce((acc: any, student) => {
+  // 🔍 ลอจิกการกรองข้อมูลแบบ Real-time ค้นหาได้รอบทิศทาง
+  const filteredStudents = students.filter((student) => {
+    // 1. กรองด้วยศูนย์ที่เลือก
+    if (selectedCenter !== "all" && student.center_id !== selectedCenter) {
+      return false;
+    }
+
+    // 2. กรองด้วยคีย์เวิร์ด (ชื่อ, นามสกุล, ชื่อเล่น, ID)
+    const searchLower = searchTerm.toLowerCase().trim();
+    if (!searchLower) return true; // ถ้าไม่ได้พิมพ์อะไร ให้ผ่านหมด
+
+    const fullName = `${student.first_name || ""} ${student.last_name || ""}`.toLowerCase();
+    const nickname = (student.nickname || "").toLowerCase();
+    const studentId = (student.student_id_10 || "").toLowerCase(); // รองรับการค้นหาด้วย ID
+
+    return (
+      fullName.includes(searchLower) || 
+      nickname.includes(searchLower) || 
+      studentId.includes(searchLower)
+    );
+  });
+
+  // 📐 จัดกลุ่มนักเรียนที่ผ่านการกรองแล้ว (Group by Center -> Group by Room)
+  const groupedStudents = filteredStudents.reduce((acc: any, student) => {
     const center = student.center_id || "Unknown";
     const room = student.room_number || "Unknown";
     
@@ -54,22 +80,100 @@ export default function StudentsPage() {
       <div className="max-w-7xl mx-auto">
         
         {/* Header Section */}
-        <div className="flex justify-between items-center mb-10">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
           <div>
             <h1 className="text-4xl font-black text-slate-800">ระบบดูแล<span className="text-blue-400">นักเรียน</span> 👶</h1>
-            <p className="text-slate-400 font-bold mt-1">รายชื่อแยกตามศูนย์และห้องเรียน</p>
+            <p className="text-slate-400 font-bold mt-1">รายชื่อแยกตามศูนย์และห้องเรียน ของศูนย์พัฒนาเด็กเล็กเทศบาลเมืองท่าบ่อ</p>
           </div>
           <Link 
             href="/admin/add-student" 
-            className="px-8 py-4 bg-blue-500 text-white rounded-[2rem] font-black hover:bg-blue-400 transition-all shadow-lg shadow-blue-200"
+            className="px-8 py-4 bg-blue-500 text-white rounded-[2rem] font-black hover:bg-blue-400 transition-all shadow-lg shadow-blue-200 active:scale-95"
           >
             + เพิ่มนักเรียนใหม่
           </Link>
         </div>
 
+        {/* 🪄 Magic Search Box Area */}
+        <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 mb-12 space-y-4">
+          <div className="flex flex-col lg:flex-row gap-4">
+            
+            {/* ช่องพิมพ์ค้นหา */}
+            <div className="flex-1 relative">
+              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-xl">🔍</span>
+              <input
+                type="text"
+                placeholder="ค้นหาด้วย ชื่อจริง, นามสกุล, ชื่อเล่น หรือรหัสประจำตัวเด็ก..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-14 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-[2rem] font-medium text-slate-700 placeholder-slate-400 focus:outline-none focus:border-blue-300 focus:bg-white transition-all text-sm md:text-base"
+              />
+              {searchTerm && (
+                <button 
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold text-sm bg-slate-200/60 w-6 h-6 rounded-full flex items-center justify-center transition-colors"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* ปุ่ม Quick Filter เลือกศูนย์ */}
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-xs font-black text-slate-400 uppercase tracking-wider mr-2 hidden sm:inline">เลือกศูนย์:</span>
+              <button
+                onClick={() => setSelectedCenter("all")}
+                className={`px-5 py-3.5 rounded-[1.5rem] text-xs font-black transition-all ${
+                  selectedCenter === "all"
+                    ? "bg-slate-800 text-white shadow-md"
+                    : "bg-slate-50 text-slate-500 hover:bg-slate-100"
+                }`}
+              >
+                ทั้งหมด ({students.length})
+              </button>
+              {Object.keys(centerNames).map((id) => {
+                const count = students.filter(s => s.center_id === id).length;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setSelectedCenter(id)}
+                    className={`px-5 py-3.5 rounded-[1.5rem] text-xs font-black transition-all ${
+                      selectedCenter === id
+                        ? "bg-blue-500 text-white shadow-md shadow-blue-100"
+                        : "bg-slate-50 text-slate-500 hover:bg-slate-100"
+                    }`}
+                  >
+                    {centerNames[id]} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+          </div>
+
+          {/* แถบแสดงสถานะผลการค้นหา */}
+          {searchTerm && (
+            <div className="text-xs font-bold text-blue-400 pl-2">
+              ✨ กำลังแสดงผลการค้นหาสำหรับ "{searchTerm}" เจอทั้งหมด {filteredStudents.length} คน
+            </div>
+          )}
+        </div>
+
         {loading ? (
           <div className="flex justify-center py-20">
             <div className="animate-bounce text-blue-400 font-black">กำลังโหลดข้อมูล...</div>
+          </div>
+        ) : filteredStudents.length === 0 ? (
+          /* กรณีค้นหาแล้วไม่เจอเด็กเลย */
+          <div className="bg-white rounded-[3rem] p-16 text-center border-2 border-dashed border-slate-200">
+            <div className="text-5xl mb-4">🐣</div>
+            <h3 className="text-xl font-black text-slate-700">ไม่พบข้อมูลนักเรียนที่ค้นหา</h3>
+            <p className="text-slate-400 font-medium mt-1 text-sm">ลองตรวจสอบการสะกดชื่อ ชื่อเล่น หรือสลับฟิลเตอร์ศูนย์ดูอีกครั้งนะเพื่อนรัก</p>
+            <button 
+              onClick={() => { setSearchTerm(""); setSelectedCenter("all"); }}
+              className="mt-6 px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all"
+            >
+              ล้างการค้นหาทั้งหมด
+            </button>
           </div>
         ) : (
           <div className="space-y-16">
