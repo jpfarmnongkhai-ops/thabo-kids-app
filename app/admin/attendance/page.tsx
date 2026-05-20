@@ -2,7 +2,8 @@
 import { useState, useEffect, Suspense } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
-import AttendanceTable from "@/components/AttendanceTable"; // 🎯 Import ตารางตัวใหม่เข้ามา!
+import AttendanceTable from "@/components/AttendanceTable";
+import AttendancePrintReport from "@/components/AttendancePrintReport";
 
 function AttendanceContent() {
   const router = useRouter();
@@ -13,11 +14,30 @@ function AttendanceContent() {
   const [students, setStudents] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<{ [key: string]: string }>({});
   const [loading, setLoading] = useState(false);
+  const [isPreview, setIsPreview] = useState(false);
+  
+  // 📅 1. เพิ่ม State เก็บวันที่ที่เลือก (Default เป็นวันที่ปัจจุบัน เพื่อเปิดมาเจอวันนี้เลย)
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [thaiDateString, setThaiDateString] = useState("");
+  const [dbTeachers, setDbTeachers] = useState<any[]>([]);
+
+  // 🗓️ คำนวณ วันที่ไทยแบบ Dynamic ตาม "selectedDate" ที่ผู้ใช้เลือกเปลี่ยนไปเปลี่ยนมา
+  useEffect(() => {
+    const options: Intl.DateTimeFormatOptions = { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    };
+    const dateObj = new Date(selectedDate);
+    const dateFormatted = dateObj.toLocaleDateString('th-TH', options);
+    setThaiDateString(dateFormatted);
+  }, [selectedDate]); // ทำงานใหม่ทุกครั้งที่สลับวันที่!
 
   const centers = [
     { id: "01", name: "ศูนย์ 1 ท่าเสด็จ" },
     { id: "11", name: "ศูนย์ 1 ท่าเสด็จ (เพิ่มเติม)" },
-    { id: "02", name: "ศูนย์ 2 น้ำโมง" }
+    { id: "02", name: "ศูนย์ 2 บ้านน้ำโมง" }
   ];
 
   const roomOptions = [
@@ -27,51 +47,102 @@ function AttendanceContent() {
     { label: "อนุบาล 1/2", value: "22", bg: "bg-[#FBC4AB]" },
   ];
 
+  const currentCenter = centers.find(c => c.id === centerId)?.name || "";
+  const currentRoom = roomOptions.find(r => r.value === room)?.label || "";
+  
+  const currentTeacherName = dbTeachers.length > 0 
+    ? dbTeachers.map(t => `คุณครู${t.first_name} ${t.last_name} (ครู${t.nickname})`).join(" / ")
+    : "คุณครูประจำชั้น";
+
+  // ดึงข้อมูลครูประจำชั้น
+  useEffect(() => {
+    const fetchTeachersByFilter = async () => {
+      const { data } = await supabase
+        .from("teachers")
+        .select("*")
+        .eq("center_id", centerId) 
+        .eq("room_number", room);
+      if (data) setDbTeachers(data);
+    };
+    fetchTeachersByFilter();
+  }, [centerId, room]);
+
+  // 📋 ดึงข้อมูลนักเรียนและประวัติเช็คชื่อ "ตามวันที่เลือก (selectedDate)"
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const today = new Date().toISOString().split('T')[0];
 
+      // ดึงรายชื่อเด็กในห้องเรียน
       const { data: studentData } = await supabase
-  .from("students")
-  .select("student_id_10, first_name, last_name, nickname, gender_code")
-  .eq("center_id", centerId)
-  .eq("room_number", room)
-  .order("student_id_10", { ascending: true }); // 🎯 เปลี่ยนมาเรียงลำดับตาม ID จากน้อยไปมาก
+        .from("students")
+        .select("student_id_10, first_name, last_name, nickname, gender_code")
+        .eq("center_id", centerId)
+        .eq("room_number", room)
+        .order("student_id_10", { ascending: true });
       if (studentData) setStudents(studentData);
 
+      // 🎯 เปลี่ยนจากดึง "today" มาเป็นดึงตาม "selectedDate" ที่ครูสลับเลือก
       const { data: attData } = await supabase
         .from("attendance")
         .select("student_id_10, status")
-        .eq("check_date", today);
+        .eq("check_date", selectedDate);
 
+      const attMap: { [key: string]: string } = {};
       if (attData) {
-        const attMap: { [key: string]: string } = {};
         attData.forEach(item => attMap[item.student_id_10] = item.status);
-        setAttendance(attMap);
       }
+      setAttendance(attMap); // หน้าจอจะอัปเดตประวัติเช็คชื่อของวันนั้นทันที!
       setLoading(false);
     };
     fetchData();
-  }, [centerId, room]);
+  }, [centerId, room, selectedDate]); // เติม selectedDate ที่นี่เพื่อให้ยิง Query ใหม่เมื่อเปลี่ยนวัน
 
+  // บันทึกเช็คชื่อลงฐานข้อมูลตามวันที่เลือก
   const handleCheck = async (studentId: string, status: string) => {
-    const today = new Date().toISOString().split('T')[0];
-    setAttendance(prev => ({ ...prev, [studentId]: status }));
+    let thaiStatus = status;
+    if (status === "present") thaiStatus = "มา";
+    if (status === "absent") thaiStatus = "ขาด";
+    if (status === "late") thaiStatus = "สาย";
+    if (status === "leave") thaiStatus = "ลา";
 
+    setAttendance(prev => ({ ...prev, [studentId]: thaiStatus }));
+
+    // บันทึกลง Supabase โดยอ้างอิงตามวันที่เลือก (กดแก้ย้อนหลังได้ด้วย!)
     await supabase.from("attendance").upsert({ 
       student_id_10: studentId, 
-      status: status,
-      check_date: today
+      status: thaiStatus,
+      check_date: selectedDate
     }, { onConflict: 'student_id_10,check_date' });
   };
 
+  if (isPreview) {
+    return (
+      <div className="min-h-screen bg-[#FDFCF0] p-6">
+        <div className="max-w-3xl mx-auto mb-4 no-print">
+          <button
+            onClick={() => setIsPreview(false)}
+            className="px-5 py-2.5 bg-slate-800 text-white font-bold rounded-2xl shadow-sm hover:bg-slate-700 transition-all text-sm"
+          >
+            ← กลับไปหน้าเช็คชื่อ
+          </button>
+        </div>
+        <AttendancePrintReport 
+          centerName={currentCenter}
+          roomLabel={currentRoom}
+          teacherName={currentTeacherName}
+          students={students}
+          attendance={attendance}
+          thaiDate={thaiDateString} // ส่งวันที่ไทยของวันนั้นไปพิมพ์ลง A4 ด้วย!
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#FDFCF0] p-6 pb-40 flex flex-col items-center font-sans">
-      {/* 📐 ขยายขนาดความกว้างขึ้นเป็น max-w-3xl ให้รับสัดส่วนตาราง */}
       <div className="w-full max-w-3xl">
         <header className="mb-8">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex justify-between items-center mb-4">
             <button 
               onClick={() => router.push('/')} 
               className="w-12 h-12 bg-white rounded-2xl text-[#B19CD9] shadow-sm flex items-center justify-center border-2 border-[#B19CD9]/20 hover:scale-105 active:scale-95 transition-all"
@@ -79,7 +150,27 @@ function AttendanceContent() {
               <span className="text-xl">←</span>
             </button>
             <h1 className="text-2xl font-black text-[#A084D6] tracking-tight">ระบบเช็คชื่อน้อง ๆ 📋</h1>
-            <div className="w-12 h-12 bg-[#D9F3FF] rounded-2xl flex items-center justify-center text-xl shadow-inner">✨</div>
+            
+            <button
+              onClick={() => setIsPreview(true)}
+              className="px-4 h-12 bg-[#A084D6] text-white rounded-2xl font-black text-xs shadow-sm flex items-center justify-center gap-2 hover:scale-105 active:scale-95 transition-all border-2 border-white"
+            >
+              <span>🖨️ พิมพ์รายงาน</span>
+            </button>
+          </div>
+
+          {/* 📅 2. กล่องเลือกวันที่แบบน่ารัก ๆ สลับวันดูข้อมูลย้อนหลังได้อิสระ */}
+          <div className="bg-white p-4 rounded-[2rem] shadow-sm border-2 border-white flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
+            <div className="text-center sm:text-left">
+              <span className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">กำลังแสดงข้อมูลของวันที่</span>
+              <p className="text-xs font-bold text-[#A084D6]">{thaiDateString}</p>
+            </div>
+            <input 
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="px-4 py-2 rounded-xl bg-slate-50 border-2 border-[#B19CD9]/20 font-bold text-slate-600 outline-none focus:border-[#A084D6] cursor-pointer text-sm"
+            />
           </div>
           
           <div className="bg-white p-5 rounded-[2.5rem] shadow-sm border-2 border-white">
@@ -111,10 +202,16 @@ function AttendanceContent() {
           ))}
         </div>
 
-        {/* 📦 พื้นที่แสดงผลข้อมูลตารางเช็คชื่อ */}
+        <div className="text-center mb-6">
+          <p className="text-xs font-bold text-slate-400">
+            👩‍🏫 ครูประจำชั้นห้องนี้: <span className="text-[#A084D6] font-black">{currentTeacherName}</span>
+          </p>
+        </div>
+
+        {/* ตารางเช็คชื่อน้องๆ */}
         <div>
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-20 animate-pulse">
+            <div className="flex flex-col items-center justify-center py-20 animate-pulse bg-white rounded-[3rem] p-6 shadow-sm">
               <div className="w-12 h-12 bg-[#E6E6FA] rounded-full mb-4"></div>
               <p className="text-[#B19CD9] font-black text-sm italic">กำลังเรียกน้องๆ เข้าแถวในตาราง...</p>
             </div>
@@ -124,7 +221,6 @@ function AttendanceContent() {
               <p>ไม่พบรายชื่อในห้องนี้นะครับ</p>
             </div>
           ) : (
-            /* 🔥 ส่งข้อมูลข้ามไปให้ตารางตัวเก่งของเราวาดผลลัพธ์ */
             <AttendanceTable 
               students={students} 
               attendance={attendance} 
@@ -133,8 +229,8 @@ function AttendanceContent() {
           )}
         </div>
 
-        {/* ปุ่มเซฟด้านล่าง */}
-        <div className="fixed bottom-8 left-6 right-6 flex justify-center z-50">
+        {/* ปุ่มบันทึกเซฟด้านล่าง */}
+        <div className="fixed bottom-8 left-6 right-6 flex justify-center z-50 no-print">
           <button 
             onClick={() => router.push('/admin/dashboard')} 
             className="w-full max-w-sm bg-[#FF85B3] text-white py-5 rounded-[2.5rem] font-black shadow-2xl shadow-pink-200 active:scale-95 transition-all flex items-center justify-center gap-3 border-4 border-white"
@@ -151,7 +247,9 @@ function AttendanceContent() {
 export default function AttendancePage() {
   return (
     <Suspense fallback={<div className="p-10 text-center font-bold">กำลังโหลด...</div>}>
-      <AttendanceContent />
+      <Suspense fallback={<div className="p-10 text-center font-bold">กำลังโหลด...</div>}>
+        <AttendanceContent />
+      </Suspense>
     </Suspense>
   );
 }

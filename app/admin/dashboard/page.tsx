@@ -112,7 +112,7 @@ export default function AdminControlCenter() {
         {/* Menu Grid & HUD Sci-Fi */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <MenuCard title="จัดการนักเรียน" desc="รายชื่อนักเรียน ย้ายห้อง และสถานะ" icon="👶" href="/admin/students" color="rose" />
-          <MenuCard title="ลงเวลาเรียน" desc="บันทึกการมาเรียนประจำวัน" icon="📝" href="/admin/attendance" color="amber" />
+          <MenuCard title="เช็คชื่อเด็กนักเรียน" desc="บันทึกการมาเรียนประจำวัน" icon="📝" href="/admin/attendance" color="amber" />
           <MenuCard title="บันทึกผลการประเมิน" desc="ประเมินพัฒนาการและหน่วยการเรียนรู้" icon="📊" href="/admin/assessment" color="purple" />
           <MenuCard title="จัดการบุคลากร" desc="ข้อมูลครูและเบอร์ติดต่อ" icon="👩‍🏫" href="/admin/teachers" color="green" />
           <MenuCard title="คลังเอกสาร" desc="ระเบียบ สั่งการ และเอกสารราชการ" icon="📁" href="/admin/docs-cdc" color="blue" />
