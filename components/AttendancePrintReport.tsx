@@ -14,7 +14,7 @@ interface AttendanceReportProps {
   teacherName?: string;
   students?: Student[];
   attendance?: { [key: string]: string };
-  thaiDate?: string; // 📅 รับค่าวันที่ไทยจากหน้าหลักมาแสดงผลบนหัวกระดาษ
+  thaiDate?: string;
 }
 
 export default function AttendancePrintReport({
@@ -26,24 +26,22 @@ export default function AttendancePrintReport({
   thaiDate = ""
 }: AttendanceReportProps) {
 
-  // 📝 ฟังก์ชันแปลงสถานะภาษาอังกฤษ/ค่าว่าง ให้เป็นภาษาไทยเพื่อการรายงานที่สมบูรณ์
   const getThaiStatus = (status: string) => {
     if (!status || status === "-") return "ยังไม่เช็ค";
     if (status === "present" || status === "มา") return "มา";
     if (status === "absent" || status === "ขาด") return "ขาด";
     if (status === "late" || status === "สาย") return "สาย";
     if (status === "leave" || status === "ลา") return "ลา";
-    return status; // คืนค่าเดิมกรณีที่มีการส่งค่าภาษาไทยมาอยู่แล้ว
+    return status;
   };
 
-  // 🎨 ฟังก์ชันกำหนดสีของตัวอักษรตามสถานะภาษาไทย
   const getStatusColor = (thaiStatus: string) => {
     switch (thaiStatus) {
-      case "มา": return "#10B981";      // สีเขียวสดใส
-      case "ขาด": return "#EF4444";     // สีแดงเด่นชัด
-      case "ลา": return "#3B82F6";      // สีฟ้า (เพิ่มเคสใบลา)
-      case "สาย": return "#F59E0B";     // สีส้มอมเหลือง
-      default: return "#94A3B8";        // สีเทาสำหรับกลุ่มยังไม่เช็คชื่อ
+      case "มา": return "#10B981";
+      case "ขาด": return "#EF4444";
+      case "ลา": return "#3B82F6";
+      case "สาย": return "#F59E0B";
+      default: return "#94A3B8";
     }
   };
 
@@ -55,6 +53,29 @@ export default function AttendancePrintReport({
             size: A4 portrait;
             margin: 10mm 12mm;
           }
+          
+          /* 🎯 1. ซ่อนทุกองค์ประกอบภายนอกแอป (พวกแถบตัววิ่ง แถบเมนูข้างบน) */
+          body * {
+            visibility: hidden;
+            background-color: transparent !important;
+          }
+
+          /* 🎯 2. สั่งให้แสดงเฉพาะกล่องรายงานตัวนี้ตัวเดียวเท่านั้น */
+          .report-container, .report-container * {
+            visibility: visible;
+          }
+
+          /* 🎯 3. ดันรายงานขึ้นไปจัดวางตำแหน่งชิดขอบบนสุดของหน้ากระดาษ */
+          .report-container {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            background-color: #FDFCF0 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+
           body {
             background-color: #FDFCF0 !important;
             -webkit-print-color-adjust: exact;
@@ -184,7 +205,6 @@ export default function AttendancePrintReport({
           </thead>
           <tbody>
             {students.map((student, index) => {
-              // 🎯 ดึงสถานะดิบจากอ็อบเจกต์มาทำการแปลงให้เป็นภาษาไทยที่สมบูรณ์
               const rawStatus = attendance[student.student_id_10] || "-";
               const thaiStatus = getThaiStatus(rawStatus);
 

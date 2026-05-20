@@ -115,10 +115,12 @@ function AttendanceContent() {
     }, { onConflict: 'student_id_10,check_date' });
   };
 
+  // 🖨️ แสดงแผ่นรายงานเดี่ยวสั่งพิมพ์เมื่ออยู่ในโหมด Preview
   if (isPreview) {
     return (
-      <div className="min-h-screen bg-[#FDFCF0] p-6">
-        <div className="max-w-3xl mx-auto mb-4 no-print">
+      <div className="min-h-screen bg-[#FDFCF0] p-6 print:p-0">
+        {/* กล่องปุ่มกดนี้จะถูกซ่อนอัตโนมัติเมื่อพิมพ์จริงเพราะมีคลาส no-print */}
+        <div className="max-w-3xl mx-auto mb-4 no-print flex justify-between items-center">
           <button
             onClick={() => setIsPreview(false)}
             className="px-5 py-2.5 bg-slate-800 text-white font-bold rounded-2xl shadow-sm hover:bg-slate-700 transition-all text-sm"
@@ -126,13 +128,15 @@ function AttendanceContent() {
             ← กลับไปหน้าเช็คชื่อ
           </button>
         </div>
+
+        {/* เรียก Component รายงาน */}
         <AttendancePrintReport 
           centerName={currentCenter}
           roomLabel={currentRoom}
           teacherName={currentTeacherName}
           students={students}
           attendance={attendance}
-          thaiDate={thaiDateString} // ส่งวันที่ไทยของวันนั้นไปพิมพ์ลง A4 ด้วย!
+          thaiDate={thaiDateString}
         />
       </div>
     );
