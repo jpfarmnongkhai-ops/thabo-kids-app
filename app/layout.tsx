@@ -21,6 +21,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="th" className={inter.variable}>
+      <head>
+        {/* เพิ่มบรรทัดนี้เข้าไปครับ */}
+        <link rel="manifest" href="/manifest.json" />
+      </head>
       <body className="antialiased min-h-screen flex flex-col font-sans bg-[#FDFBF7]">
         <AnnouncementBar />
         <main className="flex-grow relative">
