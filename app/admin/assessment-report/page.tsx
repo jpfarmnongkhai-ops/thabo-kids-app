@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -35,7 +35,7 @@ function ReportContent() {
   const [loading, setLoading] = useState(true);
   const [unitName, setUnitName] = useState("กำลังโหลดข้อมูลหน่วยเรียนรู้...");
   const [searchTerm, setSearchTerm] = useState(""); // 🔍 คีย์เวิร์ดค้นหาชื่อเด็ก
-  const [teacherName, setTeacherName] = useState(""); // 👩‍🏫 ชื่อครูผู้รายงาน (พิมพ์เปลี่ยนได้)
+  const [teacherName, setTeacherName] = useState(""); // 👩‍🏫 ชื่อครูผู้รายงาน
   
   // เก็บรายชื่อและคะแนนสรุปของเด็กแต่ละคน
   const [studentRows, setStudentRows] = useState<any[]>([]);
@@ -57,143 +57,164 @@ function ReportContent() {
     { label: "ควรส่งเสริม (1)", count: 0, percentage: 0, bg: "bg-red-500", text: "text-red-700", border: "border-red-200", lightBg: "bg-red-50" },
   ]);
 
-  useEffect(() => {
-    async function fetchAndCalculateReport() {
-      try {
-        setLoading(true);
-        const targetWeekNum = parseInt(week) || 1;
+  const fetchAndCalculateReport = useCallback(async () => {
+  try {
+    setLoading(true);
+    const targetWeekNum = parseInt(week) || 1;
 
-        // --- 1. ดึงชื่อหน่วยการเรียนรู้ ---
-        const { data: templates } = await supabase
-          .from("assessment_templates")
-          .select("week, unit_name");
+    // --- 1. ดึงข้อมูลเทมเพลตกิจกรรม เพื่อแมปหาประเภทกิจกรรมหลัก ---
+    const { data: templates, error: tempErr } = await supabase
+      .from("assessment_templates")
+      .select("id, week_number, unit_name, activity_type")
+      .eq("week_number", targetWeekNum);
 
-        const currentWeekTemplates = templates?.filter(t => Number(t.week) === targetWeekNum) || [];
-        setUnitName(currentWeekTemplates[0]?.unit_name || "หน่วยการเรียนรู้ประจำสัปดาห์");
+    if (tempErr) throw tempErr;
 
-        // --- 2. ดึงข้อมูลนักเรียนทั้งหมดในห้องเรียนนี้ ---
-        const { data: allStudents, error: studentError } = await supabase
-          .from("students")
-          .select("id, first_name, last_name, nickname, center_id, room_number");
+    setUnitName(templates?.[0]?.unit_name || `หน่วยแรกรับประทับใจ 1`);
 
-        if (studentError) throw studentError;
+    // ทำ Map จับคู่ไอดีข้อประเมินย่อย -> กิจกรรมหลัก 6 กิจกรรม
+    const templateActivityMap = new Map<string, string>();
+    const currentWeekTemplateIds: string[] = [];
+    
+    templates?.forEach(t => {
+      // ตรวจสอบเผื่อช่องว่างใน String ของกิจกรรมหลัก
+      const cleanActivityType = t.activity_type ? t.activity_type.trim() : "";
+      templateActivityMap.set(t.id, cleanActivityType);
+      currentWeekTemplateIds.push(t.id);
+    });
 
-        // กรองเอาเฉพาะเด็กที่ตรงศูนย์และห้องเรียนจริง ๆ
-        const filteredStudents = allStudents?.filter(s => {
-          const sCenter = String(s.center_id || '').trim();
-          const sRoom = String(s.room_number || '').trim();
-          const targetCenter = String(center).trim();
-          const targetRoom = String(room).trim();
+    // --- 2. ดึงข้อมูลนักเรียนทั้งหมดในห้องเรียนนี้ ---
+    const { data: allStudents, error: studentError } = await supabase
+      .from("students")
+      .select("id, first_name, last_name, nickname, center_id, room_number")
+      .eq("center_id", center)
+      .eq("room_number", room);
 
-          const isCenterMatch = sCenter === targetCenter || Number(sCenter) === Number(targetCenter) ||
-                                (targetCenter === "01" && sCenter === "1") || (targetCenter === "02" && sCenter === "2");
-          const isRoomMatch = sRoom === targetRoom || Number(sRoom) === Number(targetRoom);
+    if (studentError) throw studentError;
 
-          return isCenterMatch && isRoomMatch;
-        }) || [];
-
-        if (filteredStudents.length === 0) {
-          setStudentRows([]);
-          setLoading(false);
-          return;
-        }
-
-        const studentIds = filteredStudents.map(s => s.id);
-
-        // --- 3. ดึงคะแนนประเมินผลจากตาราง student_score ---
-        const { data: scoreRecords, error: scoreError } = await supabase
-          .from("student_score")
-          .select("student_id, week_number, scores")
-          .eq("week_number", targetWeekNum)
-          .in("student_id", studentIds);
-
-        if (scoreError) throw scoreError;
-
-        const scoreMap = new Map();
-        scoreRecords?.forEach(rec => {
-          scoreMap.set(rec.student_id, rec.scores || {});
-        });
-
-        // --- 4. ถอดรหัส JSONB มาคำนวณสถิติและเตรียมแถวรายชื่อเด็ก ---
-        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-        const actKeys = ["moving", "experience", "creative", "free", "outdoor", "game"];
-
-        let actTotals: Record<string, { sum: number; count: number }> = {};
-        actKeys.forEach(k => { actTotals[k] = { sum: 0, count: 0 }; });
-
-        let qCount = { good: 0, fair: 0, improve: 0 };
-        let preparedRows: any[] = [];
-
-        filteredStudents.forEach(student => {
-          const dbScores = scoreMap.get(student.id) || {};
-          let studentSum = 0;
-          let studentCount = 0;
-
-          // วนลูปนับคะแนนส่วนตัวเด็ก
-          days.forEach(day => {
-            if (dbScores[day]) {
-              actKeys.forEach(key => {
-                if (dbScores[day][key] !== undefined && dbScores[day][key] !== null) {
-                  const score = Number(dbScores[day][key]);
-                  actTotals[key].sum += score;
-                  actTotals[key].count += 1;
-
-                  studentSum += score;
-                  studentCount += 1;
-                }
-              });
-            }
-          });
-
-          // คำนวณเกรดเฉลี่ยรายบุคคล (คะแนนเต็มสูงสุดคือ 3)
-          const finalAvg = studentCount > 0 ? studentSum / studentCount : 0;
-          let qualityLabel = "ยังไม่มีการประเมิน";
-          
-          if (studentCount > 0) {
-            if (finalAvg > 2.50) { qCount.good++; qualityLabel = "ดี (3)"; }
-            else if (finalAvg > 1.50) { qCount.fair++; qualityLabel = "พอใช้ (2)"; }
-            else { qCount.improve++; qualityLabel = "ควรส่งเสริม (1)"; }
-          }
-
-          preparedRows.push({
-            id: student.id,
-            fullName: `${student.first_name} ${student.last_name}`,
-            nickname: student.nickname ? `(${student.nickname})` : "",
-            evaluatedCount: studentCount,
-            averageScore: finalAvg,
-            quality: qualityLabel
-          });
-        });
-
-        setStudentRows(preparedRows);
-
-        // 📊 สรุปเปอร์เซ็นต์กิจกรรมหลัก (คะแนนที่ได้ / คะแนนเต็มสูงสุด) * 100
-        setActivities([
-          { name: "กิจกรรมเคลื่อนไหวและจังหวะ", percentage: actTotals["moving"].count > 0 ? (actTotals["moving"].sum / (actTotals["moving"].count * 3)) * 100 : 0 },
-          { name: "กิจกรรมเสริมประสบการณ์", percentage: actTotals["experience"].count > 0 ? (actTotals["experience"].sum / (actTotals["experience"].count * 3)) * 100 : 0 },
-          { name: "กิจกรรมสร้างสรรค์", percentage: actTotals["creative"].count > 0 ? (actTotals["creative"].sum / (actTotals["creative"].count * 3)) * 100 : 0 },
-          { name: "กิจกรรมเสรี", percentage: actTotals["free"].count > 0 ? (actTotals["free"].sum / (actTotals["free"].count * 3)) * 100 : 0 },
-          { name: "กิจกรรมกลางแจ้ง", percentage: actTotals["outdoor"].count > 0 ? (actTotals["outdoor"].sum / (actTotals["outdoor"].count * 3)) * 100 : 0 },
-          { name: "กิจกรรมเกมการศึกษา", percentage: actTotals["game"].count > 0 ? (actTotals["game"].sum / (actTotals["game"].count * 3)) * 100 : 0 },
-        ]);
-
-        // สรุปสัดส่วนตามกลุ่มคุณภาพ
-        const evaluatedTotal = qCount.good + qCount.fair + qCount.improve;
-        setQualitySummary([
-          { label: "ดี (3)", count: qCount.good, percentage: evaluatedTotal > 0 ? Math.round((qCount.good / evaluatedTotal) * 100) : 0, bg: "bg-emerald-500", text: "text-emerald-700", border: "border-emerald-200", lightBg: "bg-emerald-50" },
-          { label: "พอใช้ (2)", count: qCount.fair, percentage: evaluatedTotal > 0 ? Math.round((qCount.fair / evaluatedTotal) * 100) : 0, bg: "bg-amber-500", text: "text-amber-700", border: "border-amber-200", lightBg: "bg-amber-50" },
-          { label: "ควรส่งเสริม (1)", count: qCount.improve, percentage: evaluatedTotal > 0 ? Math.round((qCount.improve / evaluatedTotal) * 100) : 0, bg: "bg-red-500", text: "text-red-700", border: "border-red-200", lightBg: "bg-red-50" },
-        ]);
-
-      } catch (err) {
-        console.error("❌ Error loading report:", err);
-      } finally {
-        setLoading(false);
-      }
+    if (!allStudents || allStudents.length === 0) {
+      setStudentRows([]);
+      setLoading(false);
+      return;
     }
 
+    const studentIds = allStudents.map(s => s.id);
+
+    // --- 3. ดึงคะแนนประเมินผลจากตาราง student_scores ---
+    let scoreRecords: any[] = [];
+    if (studentIds.length > 0 && currentWeekTemplateIds.length > 0) {
+      const { data: scores, error: scoreError } = await supabase
+        .from("student_scores")
+        .select("student_id, template_id, score_value")
+        .in("student_id", studentIds)
+        .in("template_id", currentWeekTemplateIds);
+
+      if (scoreError) throw scoreError;
+      scoreRecords = scores || [];
+    }
+
+    // จัดกลุ่มคะแนนแยกตามไอดีเด็กนักเรียน
+    const studentScoresGroup: Record<string, any[]> = {};
+    scoreRecords.forEach(rec => {
+      if (!studentScoresGroup[rec.student_id]) {
+        studentScoresGroup[rec.student_id] = [];
+      }
+      studentScoresGroup[rec.student_id].push(rec);
+    });
+
+    // --- 4. คำนวณสถิติภาพรวม 6 กิจกรรมหลัก ---
+    let actTotals: Record<string, { sum: number; count: number }> = {
+      "กิจกรรมเคลื่อนไหวและจังหวะ": { sum: 0, count: 0 },
+      "กิจกรรมเสริมประสบการณ์": { sum: 0, count: 0 },
+      "กิจกรรมสร้างสรรค์": { sum: 0, count: 0 },
+      "กิจกรรมเสรี": { sum: 0, count: 0 },
+      "กิจกรรมกลางแจ้ง": { sum: 0, count: 0 },
+      "กิจกรรมเกมการศึกษา": { sum: 0, count: 0 }
+    };
+
+    let qCount = { good: 0, fair: 0, improve: 0 };
+    let preparedRows: any[] = [];
+
+    allStudents.forEach(student => {
+      const myScores = studentScoresGroup[student.id] || [];
+      let studentSum = 0;
+      let studentCount = 0;
+
+      myScores.forEach(scoreRow => {
+        // 🚨 จุดตาย: เช็คให้แน่ใจว่าค่าคะแนนแปลงเป็นตัวเลขได้สมบูรณ์และไม่เป็นค่าว่าง/NaN
+        const rawScore = Number(scoreRow.score_value);
+        
+        if (!isNaN(rawScore) && rawScore > 0) { 
+          const actType = templateActivityMap.get(scoreRow.template_id);
+
+          if (actType && actTotals[actType] !== undefined) {
+            actTotals[actType].sum += rawScore;
+            actTotals[actType].count += 1;
+          }
+
+          studentSum += rawScore;
+          studentCount += 1;
+        }
+      });
+
+      // 📊 คำนวณเกรดเฉลี่ยรายบุคคล (อิงเกณฑ์คะแนนเฉลี่ยจริงตามช่วงคะแนน 1 - 3)
+      const finalAvg = studentCount > 0 ? studentSum / studentCount : 0;
+      let qualityLabel = "ยังไม่มีการประเมิน";
+      
+      if (studentCount > 0) {
+        // ใช้เกณฑ์ประเมินระดับพัฒนาการตามมาตรฐานกระทรวงปฐมวัย
+        if (finalAvg >= 2.50) { 
+          qCount.good++; 
+          qualityLabel = "ดี (3)"; 
+        } else if (finalAvg >= 1.50) { 
+          qCount.fair++; 
+          qualityLabel = "พอใช้ (2)"; 
+        } else { 
+          qCount.improve++; 
+          qualityLabel = "ควรส่งเสริม (1)"; 
+        }
+      }
+
+      preparedRows.push({
+        id: student.id,
+        fullName: `${student.first_name} ${student.last_name}`,
+        nickname: student.nickname ? `(${student.nickname})` : "",
+        evaluatedCount: studentCount,
+        averageScore: finalAvg,
+        quality: qualityLabel
+      });
+    });
+
+    setStudentRows(preparedRows);
+
+    // 📈 สรุปเปอร์เซ็นต์ความก้าวหน้าของแต่ละกิจกรรมหลัก (คะแนนที่ได้ / คะแนนเต็มทั้งหมด)
+    setActivities([
+      { name: "กิจกรรมเคลื่อนไหวและจังหวะ", percentage: actTotals["กิจกรรมเคลื่อนไหวและจังหวะ"].count > 0 ? (actTotals["กิจกรรมเคลื่อนไหวและจังหวะ"].sum / (actTotals["กิจกรรมเคลื่อนไหวและจังหวะ"].count * 3)) * 100 : 0 },
+      { name: "กิจกรรมเสริมประสบการณ์", percentage: actTotals["กิจกรรมเสริมประสบการณ์"].count > 0 ? (actTotals["กิจกรรมเสริมประสบการณ์"].sum / (actTotals["กิจกรรมเสริมประสบการณ์"].count * 3)) * 100 : 0 },
+      { name: "กิจกรรมสร้างสรรค์", percentage: actTotals["กิจกรรมสร้างสรรค์"].count > 0 ? (actTotals["กิจกรรมสร้างสรรค์"].sum / (actTotals["กิจกรรมสร้างสรรค์"].count * 3)) * 100 : 0 },
+      { name: "กิจกรรมเสรี", percentage: actTotals["กิจกรรมเสรี"].count > 0 ? (actTotals["กิจกรรมเสรี"].sum / (actTotals["กิจกรรมเสรี"].count * 3)) * 100 : 0 },
+      { name: "กิจกรรมกลางแจ้ง", percentage: actTotals["กิจกรรมกลางแจ้ง"].count > 0 ? (actTotals["กิจกรรมกลางแจ้ง"].sum / (actTotals["กิจกรรมกลางแจ้ง"].count * 3)) * 100 : 0 },
+      { name: "กิจกรรมเกมการศึกษา", percentage: actTotals["กิจกรรมเกมการศึกษา"].count > 0 ? (actTotals["กิจกรรมเกมการศึกษา"].sum / (actTotals["กิจกรรมเกมการศึกษา"].count * 3)) * 100 : 0 },
+    ]);
+
+    // 🏆 คำนวณร้อยละสัดส่วนนักเรียนตามเกณฑ์คุณภาพ (คิดเฉพาะเด็กที่ประเมินแล้ว)
+    const evaluatedTotal = qCount.good + qCount.fair + qCount.improve;
+    setQualitySummary([
+      { label: "ดี (3)", count: qCount.good, percentage: evaluatedTotal > 0 ? Math.round((qCount.good / evaluatedTotal) * 100) : 0, bg: "bg-emerald-500", text: "text-emerald-700", border: "border-emerald-200", lightBg: "bg-emerald-50" },
+      { label: "พอใช้ (2)", count: qCount.fair, percentage: evaluatedTotal > 0 ? Math.round((qCount.fair / evaluatedTotal) * 100) : 0, bg: "bg-amber-500", text: "text-amber-700", border: "border-amber-200", lightBg: "bg-amber-50" },
+      { label: "ควรส่งเสริม (1)", count: qCount.improve, percentage: evaluatedTotal > 0 ? Math.round((qCount.improve / evaluatedTotal) * 100) : 0, bg: "bg-red-500", text: "text-red-700", border: "border-red-200", lightBg: "bg-red-50" },
+    ]);
+
+  } catch (err) {
+    console.error("❌ Error loading report:", err);
+  } finally {
+    setLoading(false);
+  }
+}, [week, center, room]);
+
+  useEffect(() => {
     fetchAndCalculateReport();
-  }, [week, center, room]);
+  }, [fetchAndCalculateReport]);
 
   // 🔍 กรองรายชื่อเด็กจากช่องเสิร์ชค้นหาบนหน้าจอ
   const filteredRows = studentRows.filter(row => 
@@ -256,7 +277,7 @@ function ReportContent() {
           <div className="mt-3 inline-flex flex-wrap gap-4 justify-center bg-indigo-50 text-indigo-800 px-4 py-1.5 rounded-full text-sm font-semibold print:bg-slate-100 print:text-black">
             <span>📅 สัปดาห์ที่: {week}</span>
             <span>🎯 หน่วยการเรียนรู้หลัก: {unitName}</span>
-            <span>👶 จำนวนที่ประเมินผ่านระบบ: {studentRows.length} คน</span>
+            <span>👶 จำนวนนักเรียนทั้งหมด: {studentRows.length} คน</span>
           </div>
         </div>
 
@@ -316,7 +337,7 @@ function ReportContent() {
 
             </div>
 
-            {/* 📋 ส่วนที่เพิ่มมาใหม่: ตารางแจกแจงคะแนนและระดับคุณภาพรายบุคคล */}
+            {/* 📋 บัญชีสรุปรายบุคคล */}
             <div className="mt-4">
               <h3 className="text-md font-bold text-slate-700 mb-3 flex items-center justify-between">
                 <span>👶 สรุปบัญชีรายชื่อผลการประเมินรายบุคคลประจำชั้นเรียน</span>
@@ -328,7 +349,7 @@ function ReportContent() {
                     <tr className="bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
                       <th className="p-3 text-center w-12">ลำดับ</th>
                       <th className="p-3">ชื่อ - นามสกุลนักเรียน</th>
-                      <th className="p-3 text-center w-36">จำนวนช่องที่ประเมิน</th>
+                      <th className="p-3 text-center w-36">จำนวนกิจกรรมที่ประเมิน</th>
                       <th className="p-3 text-center w-28">คะแนนเฉลี่ย (เต็ม 3)</th>
                       <th className="p-3 text-center w-36">สรุประดับคุณภาพ</th>
                     </tr>
@@ -373,7 +394,7 @@ function ReportContent() {
             {/* ส่วนลงนามท้ายรายงานสำหรับส่งเทศบาลเมืองท่าบ่อ */}
             <div className="mt-12 pt-6 border-t border-dashed border-slate-200 grid grid-cols-1 md:grid-cols-2 text-center">
               <div className="hidden print:block text-left text-xs text-slate-400 self-end">
-                * พิมพ์เอกสารสรุปผลอัตโนมัติผ่านระบบริหารจัดการสารสนเทศปฐมวัย
+                * พิมพ์เอกสารสรุปผลอัตโนมัติผ่านระบบบริหารจัดการสารสนเทศปฐมวัย
               </div>
               <div className="justify-self-center md:justify-self-end w-64">
                 <div className="w-48 border-b border-slate-400 mx-auto mt-8 mb-2"></div>
