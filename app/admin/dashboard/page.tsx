@@ -109,15 +109,25 @@ export default function AdminControlCenter() {
           <StatBox label="มาเรียนวันนี้" value={stats.attendanceToday} isAttendance bgColor="bg-[#FECACA]" textColor="text-red-700" />
         </div>
 
-        {/* Menu Grid & HUD Sci-Fi */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <MenuCard title="จัดการนักเรียน" desc="รายชื่อนักเรียน ย้ายห้อง และสถานะ" icon="👶" href="/admin/students" color="rose" />
-          <MenuCard title="เช็คชื่อเด็กนักเรียน" desc="บันทึกการมาเรียนประจำวัน" icon="📝" href="/admin/attendance" color="amber" />
-          <MenuCard title="บันทึกผลการประเมิน" desc="ประเมินพัฒนาการและหน่วยการเรียนรู้" icon="📊" href="/admin/assessment" color="purple" />
-          <MenuCard title="จัดการบุคลากร" desc="ข้อมูลครูและเบอร์ติดต่อ" icon="👩‍🏫" href="/admin/teachers" color="green" />
-          <MenuCard title="คลังเอกสาร" desc="ระเบียบ สั่งการ และเอกสารราชการ" icon="📁" href="/admin/docs-cdc" color="blue" />
-          <HUDPerformance students={students} />
-        </div>
+       {/* ส่วน Menu Grid ที่เพิ่ม 3 วิชาเสริมเข้าไปครับ */}
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  {/* เมนูหลัก */}
+  <MenuCard title="จัดการนักเรียน" desc="รายชื่อนักเรียน ย้ายห้อง และสถานะ" icon="👶" href="/admin/students" color="rose" />
+  <MenuCard title="เช็คชื่อเด็กนักเรียน" desc="บันทึกการมาเรียนประจำวัน" icon="📝" href="/admin/attendance" color="amber" />
+  <MenuCard title="บันทึกผลการประเมิน" desc="ประเมินพัฒนาการหลัก" icon="📊" href="/admin/assessment" color="purple" />
+  
+  {/* 🎯 เมนูใหม่: 3 วิชาประสบการณ์เสริม */}
+  <MenuCard title="ดนตรี (อูคูเลเล่)" desc="ระบบประเมินวิชาดนตรี" icon="🎵" href="/admin/assessment/music" color="green" />
+  <MenuCard title="ภาษาอังกฤษ" desc="ระบบประเมินวิชาภาษาอังกฤษ" icon="🔤" href="/admin/assessment/english" color="blue" />
+  <MenuCard title="คอมพิวเตอร์" desc="ระบบประเมินวิชาคอมพิวเตอร์" icon="💻" href="/admin/assessment/computer" color="green" />
+
+  {/* เมนูอื่นๆ */}
+  <MenuCard title="จัดการบุคลากร" desc="ข้อมูลครูและเบอร์ติดต่อ" icon="👩‍🏫" href="/admin/teachers" color="green" />
+  <MenuCard title="คลังเอกสาร" desc="ระเบียบ สั่งการ และเอกสารราชการ" icon="📁" href="/admin/docs-cdc" color="blue" />
+  
+  {/* HUD Performance */}
+  <HUDPerformance students={students} />
+</div>
 
       </div>
     </div>
