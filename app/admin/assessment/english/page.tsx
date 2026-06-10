@@ -2,31 +2,29 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import AssessmentTableExcelExtra from "@/components/AssessmentTableExcelExtra";
+import { Home, Save, BarChart3, ChevronLeft } from "lucide-react"; // แนะนำให้ใช้ lucide-react เพื่อไอคอนที่สวยงาม
 import Link from "next/link";
+import { error } from "console";
 
 export default function EnglishAssessmentPage() {
   const assessmentType = "extra";
-  const subjectName = "ภาษาอังกฤษ";
+  const subjectName = "วิชาภาษาอังกฤษ";
   const activityTypeGroup = `วิชา${subjectName}`;
 
-  // --- 🎛️ Filter คัดกรองข้อมูล ---
+  // --- 🎛️ State ---
   const [selectedCenter, setSelectedCenter] = useState("01"); 
   const [selectedRoom, setSelectedRoom] = useState("12"); 
   const [selectedWeek, setSelectedWeek] = useState(1);
   const [selectedDay, setSelectedDay] = useState(1); 
-
-  // --- ✍️ State หัวข้อประเมิน ---
   const [unitName, setUnitName] = useState("");
   const [header1, setHeader1] = useState("ปฏิบัติตามข้อตกลงได้");
   const [header2, setHeader2] = useState("สนทนาโต้ตอบร่วมกับครูและเพื่อนได้");
   const [header3, setHeader3] = useState("ร่วมกิจกรรมต่างๆได้");
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
-
   const [loading, setLoading] = useState(false);
   const [students, setStudents] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]); 
   const [currentSet, setCurrentSet] = useState(0);
-
   // --- 🔄 ฟังก์ชันดึงข้อมูลพฤติกรรมและคะแนน ---
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -186,69 +184,71 @@ export default function EnglishAssessmentPage() {
     }
   };
 
-  // --- 💾 บันทึกคะแนน (Optimistic Update) ---
-  const handleSaveScore = async (studentId: string, templateId: string, scoreValue: number) => {
-    const previousStudentsState = [...students];
+const handleSaveScore = async (studentId: string, templateId: string, scoreValue: number) => {
+  try {
+    const finalScore = Number(scoreValue) || 0;
 
-    setStudents(prevStudents => 
-      prevStudents.map(std => {
-        if (std.id === studentId) {
-          return {
-            ...std,
-            scores: { ...std.scores, [templateId]: scoreValue }
-          };
-        }
-        return std;
-      })
-    );
+    // 1. ค้นหาแถวที่มีข้อมูลครบทั้ง 3 อย่าง (student + template + day)
+    const { data: existingData } = await supabase
+      .from("student_scores")
+      .select("id")
+      .eq("student_id", studentId)
+      .eq("template_id", templateId)
+      .eq("day_number", selectedDay)
+      .maybeSingle(); 
 
-    try {
-      const todayStr = new Date().toISOString().split('T')[0];
-      
-      const scorePayload: any = {
+    let query;
+    if (existingData) {
+      // ถ้าเจอข้อมูลเดิม -> อัปเดตผ่าน ID (วิธีนี้ปลอดภัยที่สุด)
+      query = supabase.from("student_scores").update({ 
+        score_value: finalScore,
+        scores: { [templateId]: finalScore }
+      }).eq("id", existingData.id);
+    } else {
+      // ถ้าไม่เจอ -> เพิ่มแถวใหม่
+      query = supabase.from("student_scores").insert({
         student_id: studentId,
         template_id: templateId,
         day_number: selectedDay,
-        score_value: scoreValue,
-        total_score: scoreValue,
-        average_score: scoreValue,
-        quality_level: scoreValue >= 3 ? "ดี" : scoreValue === 2 ? "พอใช้" : "ปรับปรุง",
-        evaluation_date: todayStr,
-        assessment_date: todayStr,
+        score_value: finalScore,
+        scores: { [templateId]: finalScore },
+        assessment_type: "extra",
         evaluator_name: "คุณครูประจำชั้น"
-      };
-
-      const { error } = await supabase
-        .from("student_scores")
-        .upsert(scorePayload, { onConflict: 'student_id,template_id,day_number' });
-
-      if (error) throw error;
-    } catch (err) {
-      console.error("❌ Save score failed:", err);
-      setStudents(previousStudentsState);
+      });
     }
-  };
 
+    const { error } = await query;
+    if (error) throw error;
+    
+    // อัปเดต UI ให้ปุ่มเปลี่ยนสี
+    setStudents(prev => prev.map(s => 
+      s.id === studentId ? { ...s, scores: { ...s.scores, [templateId]: finalScore } } : s
+    ));
+    
+  } catch (err: any) {
+    console.error("❌ บันทึกพลาด:", err);
+    alert("บันทึกไม่สำเร็จ: " + err.message);
+  }
+};
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-7xl mx-auto space-y-4">
+      <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* Banner + 🟢 ปุ่มพรีวิวลิงก์เด้งไปหน้าสรุปของคอมพิวเตอร์โดยตรง */}
-        <div className="bg-gradient-to-r from-indigo-600 to-blue-500 p-8 rounded-xl text-white shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-black">💻 ระบบจัดการและประเมินผลรายวิชาเสริม</h1>
-            <p className="text-sm opacity-95 mt-1 font-semibold">📍 แฟ้มข้อมูลวิชา: {subjectName}</p>
-                    </div>
-                    {/* 🟢 ปุ่มพรีวิวแบบเปิดหน้าต่างใหม่ (ใช้ฟังก์ชัน handlePreview แทน Link) */}
-<button 
-  onClick={() => {
-    const url = `/admin/reports_eng?center=${selectedCenter}&room=${selectedRoom}&week=${selectedWeek}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }}
-  className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 px-5 py-3 rounded-xl font-bold text-sm shadow-md transition-all active:scale-95"
->
-  📊 พรีวิวดูคะแนนและรายงานในห้อง
-</button>
+        {/* 🏠 ปุ่ม Home และ Header */}
+        <div className="flex justify-between items-center">
+            <Link href="/" className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-slate-50 transition font-bold text-slate-600">
+                <Home size={18} /> กลับหน้าหลัก
+            </Link>
+            <button 
+              onClick={() => window.open(`/admin/reports_eng?center=${selectedCenter}&room=${selectedRoom}&week=${selectedWeek}`, '_blank')}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all active:scale-95"
+            >
+              <BarChart3 size={18} /> รายงานสรุปคะแนน
+            </button>
+        </div>
+        <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-8 rounded-2xl text-white shadow-xl">
+          <h1 className="text-3xl font-black">💻 ประเมินผลรายวิชาเสริม</h1>
+          <p className="opacity-90 mt-1 font-medium text-blue-100">รายการประเมิน: {subjectName}</p>
         </div>
 
         {/* Filters คัดกรอง */}
@@ -325,15 +325,15 @@ export default function EnglishAssessmentPage() {
           </div>
         ) : (
           <AssessmentTableExcelExtra 
-            key={`${selectedDay}-${selectedWeek}-${currentSet}`}
-            students={students} 
-            activities={activities} 
-            selectedWeek={selectedWeek} 
-            selectedDay={selectedDay} 
-            onSaveScore={handleSaveScore}
-            currentSet={currentSet} 
-            setCurrentSet={setCurrentSet} 
-          />
+            key={`${selectedDay}-${selectedWeek}-${currentSet}-${JSON.stringify(students)}`}
+  students={students} 
+  activities={activities} 
+  selectedWeek={selectedWeek} 
+  selectedDay={selectedDay} 
+  onSaveScore={handleSaveScore}
+  currentSet={currentSet} 
+  setCurrentSet={setCurrentSet} 
+/>
         )}
       </div>
     </div>

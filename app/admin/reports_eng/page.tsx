@@ -29,10 +29,10 @@ function ReportContent() {
   // 📥 ดึงค่าพารามิเตอร์จาก URL Query
   const week = searchParams.get("week") || "1";
   const center = searchParams.get("center") || "01";
-  const room = searchParams.get("room") || "12"; // Default วิชาคอมพิวเตอร์ส่วนใหญ่เป็นห้อง 12
+  const room = searchParams.get("room") || "12"; 
 
   const assessmentType = "extra";
-  const subjectName = "คอมพิวเตอร์ปฐมวัย";
+  const subjectName = "วิชาภาษาอังกฤษ";
   const activityTypeGroup = `วิชา${subjectName}`;
 
   // 📊 States สำหรับการประมวลผลข้อมูล
@@ -59,7 +59,7 @@ function ReportContent() {
       setLoading(true);
       const targetWeekNum = parseInt(week) || 1;
 
-      // --- 1. ดึงข้อมูลเทมเพลตกิจกรรม เฉพาะของวิชาคอมพิวเตอร์ปฐมวัย ---
+      // --- 1. ดึงข้อมูลเทมเพลตกิจกรรม เฉพาะของวิชาดนตรีปฐมวัย ---
       const { data: templates, error: tempErr } = await supabase
         .from("assessment_templates")
         .select("id, week_number, unit_name, activity_name")
@@ -72,7 +72,7 @@ function ReportContent() {
 
       const currentUnitName = templates?.[0]?.unit_name || "ทั่วไป/ไม่ได้ระบุชื่อหน่วย";
       setUnitName(currentUnitName);
-
+console.log("🔍 ผลลัพธ์ Templates:", templates);
       // ทำ Map จับคู่ไอดีข้อประเมินย่อย -> ชื่อพฤติกรรมที่สังเกตจริง
       const templateItemMap = new Map<string, string>();
       const currentWeekTemplateIds: string[] = [];
@@ -114,6 +114,7 @@ function ReportContent() {
 
         if (scoreError) throw scoreError;
         scoreRecords = scores || [];
+        console.log("🔍 คะแนนที่ดึงได้จาก DB:", scores);
       }
 
       // จัดกลุ่มคะแนนแยกตามไอดีเด็กนักเรียน
@@ -217,7 +218,7 @@ function ReportContent() {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center py-20">
         <div className="w-14 h-14 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-        <p className="text-indigo-600 font-bold animate-pulse">กำลังสรุปผลสารสนเทศวิชาเสริมประสบการณ์... ฮ้าาาา</p>
+        <p className="text-indigo-600 font-bold animate-pulse">กำลังสรุปผลสารสนเทศวิชาเสริมประสบการณ์... </p>
       </div>
     );
   }
@@ -292,7 +293,7 @@ function ReportContent() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-800 text-white text-xs">
-                        <th className="p-3 font-semibold">พฤติกรรม/ข้อบ่งชี้คุณลักษณะวิชาคอมพิวเตอร์</th>
+                        <th className="p-3 font-semibold">พฤติกรรม/ข้อบ่งชี้คุณลักษณะ วิชาภาษาอังกฤษ</th>
                         <th className="p-3 text-center font-semibold w-32">ร้อยละเฉลี่ย</th>
                       </tr>
                     </thead>
@@ -436,7 +437,7 @@ export default function AssessmentReportPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <p className="text-indigo-600 font-bold">กำลังเปิดหน้าต่างโมดูลสรุปรายงานผลวิชาเสริมคอมพิวเตอร์...</p>
+        <p className="text-indigo-600 font-bold">กำลังเปิดหน้าต่างโมดูลสรุปรายงานผลวิชาอังกฤษ...</p>
       </div>
     }>
       <ReportContent />
