@@ -168,7 +168,7 @@ export default function DirectorUnifiedDashboard() {
                 <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">{profile.name}</h1>
                 <p className="text-sm md:text-lg font-bold text-slate-500">{profile.role}</p>
                 <div className="flex flex-wrap gap-2 mt-3 justify-center md:justify-start">
-                  <Link href="/teachers" className="px-4 py-1.5 bg-[#C7CEEA] text-[#4A5568] text-[10px] font-black rounded-xl shadow-md hover:brightness-95 transition-all">👨‍🏫 รายชื่อคณะครู</Link>
+                  <Link href="admin/teachers" className="px-4 py-1.5 bg-[#C7CEEA] text-[#4A5568] text-[10px] font-black rounded-xl shadow-md hover:brightness-95 transition-all">👨‍🏫 รายชื่อคณะครู</Link>
                   <button className="px-4 py-1.5 bg-[#FFB7B2] text-[#942A24] text-[10px] font-black rounded-xl shadow-md hover:brightness-95 transition-all">📄 EXPORT PDF</button>
                   <button className="px-4 py-1.5 bg-[#B5EAD7] text-[#2D5A47] text-[10px] font-black rounded-xl shadow-md hover:brightness-95 transition-all">📊 EXCEL</button>
                 </div>
