@@ -99,18 +99,19 @@ export default function AssessmentTableExcel({
                     <td key={sub.id} className="p-2 border text-center bg-white">
                       <div className="flex justify-center gap-1.5">
                         {[1, 2, 3].map(v => (
-                          <button
-                            key={v}
-                            type="button"
-                            onClick={() => onSaveScore(std.id, sub.id, v)}
-                            className={`w-7 h-7 rounded-full shadow-sm transition-all text-xs font-black border ${
-                              currentScore === v 
-                                ? "bg-gradient-to-b from-pink-500 to-rose-500 text-white border-rose-600 scale-110" 
-                                : "bg-slate-100 hover:bg-pink-400 hover:text-white text-slate-600 border-slate-200"
-                            }`}
-                          >
-                            {v}
-                          </button>
+                          // ในไฟล์ AssessmentTableExcelExtra (ส่วนของปุ่ม)
+<button
+  key={v}
+  type="button"
+  onClick={() => onSaveScore(std.id, sub.id, v)}
+  className={`w-7 h-7 rounded-full shadow-sm transition-all text-xs font-black border active:scale-90 
+    ${currentScore === v 
+      ? "bg-gradient-to-b from-pink-500 to-rose-500 text-white border-rose-600 scale-110 shadow-md" 
+      : "bg-slate-100 hover:bg-pink-400 hover:text-white text-slate-600 border-slate-200"
+    }`}
+>
+  {v}
+</button>
                         ))}
                       </div>
                     </td>
