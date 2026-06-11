@@ -32,11 +32,11 @@ export default function EnglishAssessmentPage() {
       // 1. ดึงรายชื่อเด็กนักเรียน
       const { data: stdData, error: stdErr } = await supabase
         .from("students")
-        .select("id, first_name, last_name, gender_code, center_id, room_number")
+        .select("id, first_name, last_name, nickname, gender_code, center_id, room_number") // ✅ เพิ่ม nickname แล้ว
         .eq("center_id", selectedCenter)
         .eq("room_number", selectedRoom);
-
-      if (stdErr) throw stdErr;
+      
+            if (stdErr) throw stdErr;
 
       // 2. ดึงโครงสร้างหัวข้อพฤติกรรม
       const { data: actData, error: actErr } = await supabase
@@ -233,109 +233,122 @@ const handleSaveScore = async (studentId: string, templateId: string, scoreValue
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
       <div className="max-w-7xl mx-auto space-y-6">
-        
-        {/* 🏠 ปุ่ม Home และ Header */}
-        <div className="flex justify-between items-center">
+        <div className="no-print space-y-6"></div>
+        {/* 1. ส่วนหน้าจอตั้งค่า (no-print) */}
+        <div className="no-print space-y-6">
+          <div className="flex justify-between items-center">
             <Link href="/" className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-slate-50 transition font-bold text-slate-600">
-                <Home size={18} /> กลับหน้าหลัก
+              <Home size={18} /> กลับหน้าหลัก
             </Link>
-            <button 
-              onClick={() => window.open(`/admin/reports_eng?center=${selectedCenter}&room=${selectedRoom}&week=${selectedWeek}`, '_blank')}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all active:scale-95"
-            >
-              <BarChart3 size={18} /> รายงานสรุปคะแนน
-            </button>
-        </div>
-        <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-8 rounded-2xl text-white shadow-xl">
-          <h1 className="text-3xl font-black">💻 ประเมินผลรายวิชาเสริม</h1>
-          <p className="opacity-90 mt-1 font-medium text-blue-100">รายการประเมิน: {subjectName}</p>
-        </div>
-
-        {/* Filters คัดกรอง */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="space-y-1">
-            <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">ศูนย์พัฒนาเด็กเล็ก</label>
-            <select value={selectedCenter} onChange={(e) => setSelectedCenter(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-700 outline-none">
-              <option value="01">ศูนย์ 1 ท่าเสด็จ</option>
-              <option value="02">ศูนย์ 2 บ้านน้ำโมง</option>
-              <option value="11">ศูนย์ 1 ท่าเสด็จ(เพิ่มเติม)</option>
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">ห้องเรียน</label>
-            <select value={selectedRoom} onChange={(e) => setSelectedRoom(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-700 outline-none">
-              <option value="11">เด็กเล็ก 1/1</option>
-              <option value="12">เด็กเล็ก 1/2</option>
-              <option value="21">อนุบาล 1/1</option>
-              <option value="22">อนุบาล 1/2</option>
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">สัปดาห์ที่</label>
-            <select value={selectedWeek} onChange={(e) => setSelectedWeek(Number(e.target.value))} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-700 outline-none">
-              {[...Array(40)].map((_, i) => <option key={i+1} value={i+1}>สัปดาห์ที่ {i+1}</option>)}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">วันที่ประเมิน</label>
-            <select value={selectedDay} onChange={(e) => setSelectedDay(Number(e.target.value))} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-700 outline-none">
-              {[1, 2, 3, 4, 5].map(d => <option key={d} value={d}>วันที่ {d}</option>)}
-            </select>
-          </div>
-        </div>
-
-        {/* แผงตั้งค่าโครงสร้างวิชา */}
-        <div className="bg-amber-50 p-6 rounded-2xl border border-amber-200 space-y-4">
-          <div className="flex items-center justify-between border-b border-amber-200 pb-2">
-            <h3 className="text-base font-bold text-amber-800">✍️ ตั้งค่าชื่อหน่วยและหัวข้อสังเกตพฤติกรรม (วิชาเสริม)</h3>
-            <span className="text-xs bg-amber-200 text-amber-900 px-2.5 py-1 rounded-full font-bold">สัปดาห์ที่ {selectedWeek} / วันที่ {selectedDay}</span>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="text-xs font-bold text-amber-700">📦 ชื่อหน่วยเรียนรู้</label>
-              <input type="text" value={unitName} onChange={(e) => setUnitName(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white" placeholder="ระบุชื่อหน่วย..."/>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-600">🎯 ข้อ 1</label>
-              <input type="text" value={header1} onChange={(e) => setHeader1(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white"/>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-600">🎯 ข้อ 2</label>
-              <input type="text" value={header2} onChange={(e) => setHeader2(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white"/>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-600">🎯 ข้อ 3</label>
-              <input type="text" value={header3} onChange={(e) => setHeader3(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white"/>
+            
+            <div className="flex gap-2">
+              
+              <button 
+                onClick={() => window.open(`/admin/reports_eng?center=${selectedCenter}&room=${selectedRoom}&week=${selectedWeek}`, '_blank')}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all active:scale-95"
+              >
+                <BarChart3 size={18} /> รายงานสรุปคะแนน
+              </button>
             </div>
           </div>
 
-          <div className="flex justify-end">
-            <button onClick={handleSaveTemplate} disabled={isSavingTemplate} className="px-6 py-2 bg-amber-600 text-white font-bold text-sm rounded-lg hover:bg-amber-700 disabled:opacity-50">
-              {isSavingTemplate ? "⏳ กำลังบันทึก..." : "💾 บันทึกโครงสร้างแผนวิชา"}
-            </button>
+          <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-8 rounded-2xl text-white shadow-xl">
+            <h1 className="text-3xl font-black">💻 ประเมินผลรายวิชาเสริม</h1>
+            <p className="opacity-90 mt-1 font-medium text-blue-100">รายการประเมิน: {subjectName}</p>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">ศูนย์พัฒนาเด็กเล็ก</label>
+              <select value={selectedCenter} onChange={(e) => setSelectedCenter(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-700 outline-none">
+                <option value="01">ศูนย์ 1 ท่าเสด็จ</option>
+                <option value="02">ศูนย์ 2 บ้านน้ำโมง</option>
+                <option value="11">ศูนย์ 1 ท่าเสด็จ(เพิ่มเติม)</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">ห้องเรียน</label>
+              <select value={selectedRoom} onChange={(e) => setSelectedRoom(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-700 outline-none">
+                <option value="11">เด็กเล็ก 1/1</option>
+                <option value="12">เด็กเล็ก 1/2</option>
+                <option value="21">อนุบาล 1/1</option>
+                <option value="22">อนุบาล 1/2</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">สัปดาห์ที่</label>
+              <select value={selectedWeek} onChange={(e) => setSelectedWeek(Number(e.target.value))} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-700 outline-none">
+                {[...Array(40)].map((_, i) => <option key={i+1} value={i+1}>สัปดาห์ที่ {i+1}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400 font-bold uppercase tracking-wider">วันที่ประเมิน</label>
+              <select value={selectedDay} onChange={(e) => setSelectedDay(Number(e.target.value))} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-700 outline-none">
+                {[1, 2, 3, 4, 5].map(d => <option key={d} value={d}>วันที่ {d}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="bg-amber-50 p-6 rounded-2xl border border-amber-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-amber-200 pb-2">
+              <h3 className="text-base font-bold text-amber-800">✍️ ตั้งค่าชื่อหน่วยและหัวข้อสังเกตพฤติกรรม (วิชาเสริม)</h3>
+              <span className="text-xs bg-amber-200 text-amber-900 px-2.5 py-1 rounded-full font-bold">สัปดาห์ที่ {selectedWeek} / วันที่ {selectedDay}</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="text-xs font-bold text-amber-700">📦 ชื่อหน่วยเรียนรู้</label>
+                <input type="text" value={unitName} onChange={(e) => setUnitName(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white" placeholder="ระบุชื่อหน่วย..."/>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-600">🎯 ข้อ 1</label>
+                <input type="text" value={header1} onChange={(e) => setHeader1(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white"/>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-600">🎯 ข้อ 2</label>
+                <input type="text" value={header2} onChange={(e) => setHeader2(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white"/>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-600">🎯 ข้อ 3</label>
+                <input type="text" value={header3} onChange={(e) => setHeader3(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white"/>
+              </div>
+              
+            </div>
+            <div className="flex justify-end">
+              <button onClick={handleSaveTemplate} disabled={isSavingTemplate} className="px-6 py-2 bg-amber-600 text-white font-bold text-sm rounded-lg hover:bg-amber-700 disabled:opacity-50">
+                {isSavingTemplate ? "⏳ กำลังบันทึก..." : "💾 บันทึกโครงสร้างแผนวิชา"}
+              </button>
+              <button 
+                onClick={() => window.print()}
+                className="flex items-center gap-2 bg-pink-500 hover:bg-pink-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all active:scale-95"
+              >
+                🖨️ พิมพ์หน้านี้
+              </button>
+              </div>
           </div>
         </div>
 
-        {/* ตารางสเปรดชีตแสดงผล (เรียกใช้ Extra Component) */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl shadow-sm border border-slate-100">
-            <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="mt-2 text-sm text-slate-500 font-bold">กำลังดึงข้อมูลและจัดสรรรายชื่อนักเรียน...</p>
-          </div>
-        ) : (
-          <AssessmentTableExcelExtra 
-            key={`${selectedDay}-${selectedWeek}-${currentSet}-${JSON.stringify(students)}`}
-  students={students} 
-  activities={activities} 
-  selectedWeek={selectedWeek} 
-  selectedDay={selectedDay} 
-  onSaveScore={handleSaveScore}
-  currentSet={currentSet} 
-  setCurrentSet={setCurrentSet} 
-/>
-        )}
-      </div>
-    </div>
+        {/* 2. ส่วนตาราง (printable-area) */}
+        <div className="printable-area">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl shadow-sm border border-slate-100">
+              <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+              <p className="mt-2 text-sm text-slate-500 font-bold">กำลังดึงข้อมูลและจัดสรรรายชื่อนักเรียน...</p>
+            </div>
+          ) : (
+            <AssessmentTableExcelExtra 
+              key={`${selectedDay}-${selectedWeek}-${currentSet}-${JSON.stringify(students)}`}
+              students={students} 
+              activities={activities} 
+              selectedWeek={selectedWeek} 
+              selectedDay={selectedDay} 
+              onSaveScore={handleSaveScore}
+              currentSet={currentSet} 
+              setCurrentSet={setCurrentSet} 
+            />
+          )}
+        </div>
+        
+      </div> {/* ปิด max-w-7xl */}
+    </div> // ปิด p-6
   );
-}
+  }
