@@ -22,15 +22,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="th" className={inter.variable}>
       <head>
-        {/* เพิ่มบรรทัดนี้เข้าไปครับ */}
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body className="antialiased min-h-screen flex flex-col font-sans bg-[#FDFBF7]">
-        <AnnouncementBar />
+        
+        {/* ส่วนนี้จะถูกซ่อนเมื่อสั่งพิมพ์ */}
+        <div className="no-print">
+          <AnnouncementBar />
+        </div>
+
         <main className="flex-grow relative">
           {children}
         </main>
-        <ChatWidget />
+
+        {/* ส่วนนี้จะถูกซ่อนเมื่อสั่งพิมพ์ */}
+        <div className="no-print">
+          <ChatWidget />
+        </div>
+        
       </body>
     </html>
   );

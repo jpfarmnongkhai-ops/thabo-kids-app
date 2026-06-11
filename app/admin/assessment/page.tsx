@@ -19,14 +19,15 @@ export default function AssessmentPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. ดึงข้อมูลนักเรียน (ดึง id ที่เป็น UUID มาจับคู่)
+      // 1. ดึงข้อมูลนักเรียน (เพิ่ม nickname เข้าไปใน select)
       const { data: stdData, error: stdErr } = await supabase
         .from("students")
-        .select("id, first_name, last_name, gender_code, center_id, room_number")
+        .select("id, first_name, last_name, nickname, gender_code, center_id, room_number") // เพิ่ม nickname
         .eq("center_id", selectedCenter)
         .eq("room_number", selectedRoom);
 
       if (stdErr) throw stdErr;
+      
         
       // 2. ดึงเทมเพลตกิจกรรม
       const { data: actData, error: actErr } = await supabase

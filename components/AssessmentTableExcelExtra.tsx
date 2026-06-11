@@ -11,7 +11,6 @@ export default function AssessmentTableExcel({
   setCurrentSet = () => {},
 }: any) {
   
-  // ป้องกันค่า currentSet บั๊กทะลุขอบเขตอาร์เรย์จริงของกิจกรรม
   useEffect(() => {
     if (activities.length > 0 && (currentSet < 0 || currentSet >= activities.length)) {
       setCurrentSet(0);
@@ -22,7 +21,6 @@ export default function AssessmentTableExcel({
     return (
       <div className="p-12 text-center bg-white rounded-2xl border border-dashed border-slate-300">
         <p className="text-slate-400 font-medium">ยังไม่มีกิจกรรมสำหรับสัปดาห์/วันที่นี้</p>
-        <button className="mt-4 text-pink-500 font-bold hover:underline">ไปที่หน้าจัดการข้อมูล</button>
       </div>
     );
   }
@@ -30,15 +28,15 @@ export default function AssessmentTableExcel({
   const safeIndex = (currentSet >= 0 && currentSet < activities.length) ? currentSet : 0;
   const currentActivity = activities[safeIndex];
 
-  // 🛠️ จุดแก้ไขไฮไลท์: ปรับโครงสร้างให้อ่านได้ทั้งวิชาหลัก (subSubstance) และวิชาเสริม (unit_name หรือ sub_activity)
   const subLabel = 
     currentActivity?.unit_name || 
     currentActivity?.sub_activity || 
     currentActivity?.subSubstance || 
-    "ไม่ได้ระบุ";
+    "ทั่วไป"; // ปรับคำ default ให้ดูเป็นธรรมชาติ
 
   return (
-    <div className="overflow-x-auto bg-white rounded-2xl shadow-sm border border-slate-100">
+    // เพิ่ม printable-area เพื่อให้สั่งพิมพ์เฉพาะตารางนี้ได้
+    <div className="printable-area overflow-x-auto bg-white rounded-2xl shadow-sm border border-slate-100">
       <div className="p-4 bg-slate-800 text-white text-center font-bold">
         สัปดาห์ที่ {selectedWeek} | วันที่ {selectedDay} | สาระการเรียนรู้ย่อย: {subLabel}
       </div>
@@ -49,8 +47,7 @@ export default function AssessmentTableExcel({
             <th rowSpan={2} className="p-2 border w-12">ลำดับ</th>
             <th rowSpan={2} className="p-2 border max-w-xs text-left">ชื่อ-นามสกุล</th>
 
-            {/* ปุ่มกดสไลด์เลื่อนสลับกลุ่มกิจกรรม (1-6) */}
-            <th colSpan={currentActivity?.subItems?.length || 1} className="p-2 border text-center bg-slate-700">
+            <th colSpan={currentActivity?.subItems?.length || 1} className="no-print p-2 border text-center bg-slate-700">
               <div className="flex justify-between items-center px-2">
                 <button
                   type="button"
@@ -73,7 +70,6 @@ export default function AssessmentTableExcel({
             </th>
           </tr>
 
-          {/* แถวหัวข้อกิจกรรมย่อยที่ดึงหัวข้อมาจากคอลัมน์ activity_name */}
           <tr>
             {currentActivity?.subItems?.map((sub: any) => (
               <th key={sub.id} className="p-2 border text-center font-normal min-w-[120px] bg-slate-500 text-white text-[11px] leading-tight">
@@ -89,30 +85,38 @@ export default function AssessmentTableExcel({
             return (
               <tr key={std.id} className="border-b hover:bg-slate-50 transition-colors">
                 <td className="p-2 border text-center font-bold text-slate-500">{i + 1}</td>
-                <td className="p-2 border font-bold text-slate-700 whitespace-nowrap">{prefix} {std.first_name} {std.last_name}</td>
+                
+                <td className="p-2 border font-bold text-slate-700 whitespace-nowrap">
+                  {prefix} {std.first_name} {std.last_name} 
+                  {std.nickname ? <span className="text-pink-500 ml-1 font-normal">({std.nickname})</span> : ''}
+                </td>
                 
                 {currentActivity?.subItems?.map((sub: any) => {
-                  // ดึงค่าระดับคะแนน (1, 2, 3) มาเทียบสีปุ่มแบบเรียลไทม์จาก State
                   const currentScore = std.scores ? std.scores[sub.id] : undefined; 
                   
                   return (
                     <td key={sub.id} className="p-2 border text-center bg-white">
-                      <div className="flex justify-center gap-1.5">
+                      {/* เพิ่ม no-print ที่นี่ เพื่อให้ปุ่มไม่แสดงตอนพิมพ์ ถ้าอยากให้แสดงแค่ค่าที่เลือกไว้ */}
+                      <div className="no-print flex justify-center gap-1.5">
                         {[1, 2, 3].map(v => (
-                          // ในไฟล์ AssessmentTableExcelExtra (ส่วนของปุ่ม)
-<button
-  key={v}
-  type="button"
-  onClick={() => onSaveScore(std.id, sub.id, v)}
-  className={`w-7 h-7 rounded-full shadow-sm transition-all text-xs font-black border active:scale-90 
-    ${currentScore === v 
-      ? "bg-gradient-to-b from-pink-500 to-rose-500 text-white border-rose-600 scale-110 shadow-md" 
-      : "bg-slate-100 hover:bg-pink-400 hover:text-white text-slate-600 border-slate-200"
-    }`}
->
-  {v}
-</button>
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => onSaveScore(std.id, sub.id, v)}
+                            className={`w-7 h-7 rounded-full shadow-sm transition-all text-xs font-black border active:scale-90 
+                              ${currentScore === v 
+                                ? "bg-gradient-to-b from-pink-500 to-rose-500 text-white border-rose-600 scale-110 shadow-md" 
+                                : "bg-slate-100 hover:bg-pink-400 hover:text-white text-slate-600 border-slate-200"
+                              }`}
+                          >
+                            {v}
+                          </button>
                         ))}
+                      </div>
+                      
+                      {/* เพิ่มส่วนนี้: เพื่อให้ตอนพิมพ์แสดงเฉพาะตัวเลขที่เลือก */}
+                      <div className="hidden print:block font-bold text-lg">
+                        {currentScore || "-"}
                       </div>
                     </td>
                   );

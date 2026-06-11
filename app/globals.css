@@ -22,6 +22,7 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
+
 /* ✅ ส่วนของ Marquee (แถบวิ่ง) ที่เพื่อนทำไว้ */
 @keyframes marquee {
   0% { transform: translateX(0); }
@@ -32,4 +33,25 @@ body {
   display: flex;
   width: max-content;
   animation: marquee 25s linear infinite;
+}
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .printable-area {
+    width: 100% !important;
+    margin: 0 !important;
+  }
+}
+@media print {
+  /* บังคับซ่อนส่วนที่อาจจะติดมาด้วย Position fixed/absolute */
+  .no-print, 
+  header, 
+  footer, 
+  [role="dialog"],
+  /* ถ้าคอมโพเนนต์มีชื่อคลาสเฉพาะ ให้ใส่เพิ่มที่นี่ เช่น */
+  .announcement-bar-class, 
+  .chat-widget-class {
+    display: none !important;
+  }
 }
