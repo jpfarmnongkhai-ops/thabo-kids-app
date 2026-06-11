@@ -396,30 +396,33 @@ console.log("🔍 ผลลัพธ์ Templates:", templates);
             </div>
 
            
-{/* ✍️ ส่วนลงนามท้ายรายงานสำหรับส่งเทศบาล (เวอร์ชันนิ่งสนิท ไม่ตกบรรทัดแน่นอนครับเพื่อน!) */}
-<div className="mt-16 pt-6 border-t border-dashed border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-6 text-center">
+{/* ✍️ ส่วนลงนามท้ายรายงานสำหรับส่งเทศบาล */}
+<div className="mt-16 pt-6 border-t border-dashed border-slate-200 flex justify-between items-end w-full">
   
   {/* ฝั่งซ้าย: หมายเหตุระบบ */}
-  <div className="hidden print:block text-left text-[10px] text-slate-400 self-end font-medium">
+  <div className="hidden print:block text-left text-[10px] text-slate-400 font-medium">
     * พิมพ์เอกสารสรุปผลอัตโนมัติผ่านระบบบริหารจัดการสารสนเทศปฐมวัย Thabo Municipality
   </div>
   
-  {/* ฝั่งขวา: บล็อกลงนามคุณครู */}
-  <div className="md:col-start-2 justify-self-center md:justify-self-end w-80 flex flex-col items-center">
+  {/* ฝั่งขวา: บล็อกลงนามคุณครู (ใช้ ml-auto ดันไปขวาสุด) */}
+  <div className="ml-auto w-80 flex flex-col items-center">
     
-    {/* บรรทัดที่ 1: ลายมือชื่อ (ลดความยาวจุดไข่ปลาลงเพื่อไม่ให้เบียดคำว่าผู้รายงาน) */}
+    {/* บรรทัดที่ 1: ลายมือชื่อ */}
     <div className="text-sm font-bold text-slate-700 text-center w-full whitespace-nowrap">
-      ( ลงชื่อ ) .................................... ผู้รายงาน
+      ( ลงชื่อ ) ......................... ผู้รายงาน
+    </div>
+    <div className="text-xs text-slate-600 mt-1 w-full text-center whitespace-nowrap">
+      การสอนประสบการณ์เสริมวิชาคอมพิวเตอร์ปฐมวัย
     </div>
     
     {/* บรรทัดที่ 2: วงเล็บชื่อ-นามสกุลตัวบรรจง */}
     <div className="text-sm font-bold text-slate-800 tracking-wide text-center mt-3 w-full whitespace-nowrap">
-      ( {teacherName ? teacherName.trim() : "........................................................"} )
+      ( {teacherName ? teacherName.trim() : "นายนวพล เทศวงศา"} )
     </div>
     
     {/* บรรทัดที่ 3: ตำแหน่ง */}
     <div className="text-xs text-slate-500 mt-2 font-medium text-center w-full whitespace-nowrap">
-      ตำแหน่ง ครูผู้สอนวิชาเสริมประสบการณ์ปฐมวัย
+      ตำแหน่ง ผู้ช่วยผู้ดูแลเด็ก
     </div>
     
   </div>
@@ -437,7 +440,7 @@ export default function AssessmentReportPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <p className="text-indigo-600 font-bold">กำลังเปิดหน้าต่างโมดูลสรุปรายงานผลวิชาคอมพิวเตอร์ปฐมวัย...</p>
+        <p className="text-indigo-600 font-bold">กำลังเปิดหน้าต่างโมดูลสรุปรายงานผลวิชาดนตรี (อูคูเลเล่)...</p>
       </div>
     }>
       <ReportContent />
